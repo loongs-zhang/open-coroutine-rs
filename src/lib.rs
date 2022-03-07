@@ -39,6 +39,9 @@ pub trait Coroutine {
     ///将执行权交给另一个非主协程
     fn resume(coroutine: dyn Coroutine);
 
+    ///将执行权交给另一个非主协程，指定时间后执行权将回到主协程，抢占调度
+    fn resume_with_timeout(coroutine: dyn Coroutine, timeout: usize);
+
     ///非主协程将执行权交还给主协程
     fn yields();
 
