@@ -57,3 +57,9 @@ pub trait Coroutine {
     ///获取协程参数
     fn get_param() -> usize;
 }
+
+///系统调用的hook
+pub trait SystemCallHook {}
+
+///调度器
+pub trait Scheduler {}
