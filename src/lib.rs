@@ -3,66 +3,114 @@ use std::any::Any;
 pub trait Frame {}
 
 pub trait Stack {
-    ///出栈
-    fn pop() -> dyn Frame;
+    /// 出栈
+    fn pop(&self) -> dyn Frame;
 
-    ///入栈
-    fn push(f: dyn Frame);
+    /// 入栈
+    fn push(&self, frame: dyn Frame);
 
-    ///获取当前栈顶指针
-    fn top() -> &dyn Frame;
+    /// 获取当前栈顶指针
+    fn top(&self) -> &dyn Frame;
 
-    ///获取当前栈底部指针
-    fn bottom() -> &dyn Frame;
+    /// 获取当前栈底部指针
+    fn bottom(&self) -> &dyn Frame;
 
-    ///栈的总大小
-    fn size() -> usize;
+    /// 栈的总大小
+    fn size(&self) -> usize;
 
-    ///已使用栈的大小
-    fn used() -> usize;
+    /// 已使用栈的大小
+    fn used(&self) -> usize;
 
-    ///剩余栈大小
-    fn remain() -> usize;
+    /// 剩余栈大小
+    fn remain(&self) -> usize;
 
-    ///清理栈
-    fn clean();
+    /// 清理栈
+    fn clear(&self);
+}
+
+pub trait MainCoroutine {
+    /// 创建一个主协程
+    fn create() -> Self;
+
+    /// 将执行权交给另一个非主协程，指定时间后执行权将回到主协程，抢占调度
+    fn resume(coroutine: &dyn Coroutine, timeout: usize);
+
+    /// 销毁协程
+    fn destroy(coroutine: &dyn Coroutine);
+
+    /// 主协程执行完毕
+    fn exit(&self);
 }
 
 pub trait Coroutine {
-    ///创建一个协程
-    fn create(main: Option<dyn Coroutine>,
-              stack: dyn Stack,
-              init: usize,
+    /// 创建一个协程
+    fn create(main: Option<&dyn MainCoroutine>,
+              stack: &dyn Stack,
               function: dyn FnOnce<dyn Any>,
-              param_pointer: usize);
+              param_pointer: usize) -> Self;
 
-    ///将执行权交给另一个非主协程
-    fn resume(coroutine: dyn Coroutine);
+    /// 非主协程将执行权交还给主协程
+    fn yields(&self);
 
-    ///将执行权交给另一个非主协程，指定时间后执行权将回到主协程，抢占调度
-    fn resume_with_timeout(coroutine: dyn Coroutine, timeout: usize);
+    /// 非主协程执行完毕
+    fn exit(&self);
 
-    ///非主协程将执行权交还给主协程
-    fn yields();
+    /// 获取协程的当前状态
+    fn state(&self);
 
-    ///非主协程执行完毕
-    fn exit();
+    /// 设置协程参数
+    fn set_param(&self, param_pointer: usize);
 
-    ///销毁协程
-    fn destroy(coroutine: dyn Coroutine);
-
-    ///获取协程的当前状态
-    fn state();
-
-    ///设置协程参数
-    fn set_param(param_pointer: usize);
-
-    ///获取协程参数
-    fn get_param() -> usize;
+    /// 获取协程参数
+    fn get_param(&self) -> usize;
 }
 
-///系统调用的hook
-pub trait SystemCallHook {}
+/// hook系统调用
+/// ```
+/// //这样可以拿到系统函数
+/// let read = unsafe { libc::dlsym(libc::RTLD_NEXT, "read".as_ptr() as *const _) };
+/// ```
+pub trait SystemCallHooker {
+    fn hook_system_call(name: &str);
 
-///调度器
-pub trait Scheduler {}
+    fn hook_socket();
+
+    fn hook_connect();
+
+    fn hook_close();
+
+    fn hook_read();
+
+    fn hook_write();
+
+    fn hook_sendto();
+
+    fn hook_recvfrom();
+
+    fn hook_send();
+
+    fn hook_recv();
+
+    fn hook_poll();
+
+    fn hook_setsockopt();
+
+    fn hook_fcntl();
+
+    fn hook_setenv();
+
+    fn hook_unsetenv();
+
+    fn hook_getenv();
+
+    /// hook __res_state
+    fn hook_res_state();
+
+    fn hook_gethostbyname();
+}
+
+/// 调度器
+pub trait Scheduler {
+    /// 一次调度
+    fn schedule();
+}
