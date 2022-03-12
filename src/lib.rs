@@ -24,6 +24,12 @@ pub trait Stack {
     /// 剩余栈大小
     fn remain(&self) -> usize;
 
+    /// 扩容为原来的2倍
+    fn resize(&self);
+
+    /// 缩容为原来的1/2
+    fn reduce(&self);
+
     /// 清理栈
     fn clear(&self);
 }
@@ -65,13 +71,15 @@ pub trait Coroutine {
     fn get_param(&self) -> usize;
 }
 
-/// hook系统调用
+/// hook系统调用，此功能仅对付费用户开放，注意加密
 /// ```
 /// //这样可以拿到系统函数
 /// let read = unsafe { libc::dlsym(libc::RTLD_NEXT, "read".as_ptr() as *const _) };
 /// ```
 pub trait SystemCallHooker {
     fn hook_system_call(name: &str);
+
+    fn hook_sleep();
 
     fn hook_socket();
 
