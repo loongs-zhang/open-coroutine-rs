@@ -1,6 +1,22 @@
 use std::any::Any;
+use std::ptr::NonNull;
 
-pub trait Frame {}
+pub trait Frame {
+    /// 栈指针
+    fn stack_pointer(&self) -> NonNull<dyn Stack>;
+
+    /// 栈帧指针
+    fn frame_pointer(&self) -> NonNull<Self>;
+
+    /// 栈帧大小
+    fn size(&self)->usize;
+
+    /// 返回此栈帧在栈的上一帧，类比递归调用的出口
+    fn previous(&self) -> &dyn Frame;
+
+    /// 返回此栈帧在栈的下一帧，类比递归调用的入口
+    fn next(&self) -> Option<&dyn Frame>;
+}
 
 pub trait Stack {
     /// 出栈
@@ -38,8 +54,8 @@ pub trait MainCoroutine {
     /// 创建一个主协程
     fn create() -> Self;
 
-    /// 将执行权交给另一个非主协程，指定时间后执行权将回到主协程，抢占调度
-    fn resume(coroutine: &dyn Coroutine, timeout: usize);
+    /// 将执行权交给另一个非主协程
+    fn resume(coroutine: &dyn Coroutine);
 
     /// 销毁协程
     fn destroy(coroutine: &dyn Coroutine);
