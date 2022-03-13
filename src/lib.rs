@@ -1,35 +1,17 @@
 use std::any::Any;
+use std::cell::Ref;
+use std::ffi::c_void;
 use std::ptr::NonNull;
+use std::rc::Rc;
 
-pub trait Frame {
-    /// 栈指针
-    fn stack_pointer(&self) -> NonNull<dyn Stack>;
-
-    /// 栈帧指针
-    fn frame_pointer(&self) -> NonNull<Self>;
-
-    /// 栈帧大小
-    fn size(&self)->usize;
-
-    /// 返回此栈帧在栈的上一帧，类比递归调用的出口
-    fn previous(&self) -> &dyn Frame;
-
-    /// 返回此栈帧在栈的下一帧，类比递归调用的入口
-    fn next(&self) -> Option<&dyn Frame>;
-}
+pub mod coroutine;
 
 pub trait Stack {
-    /// 出栈
-    fn pop(&self) -> dyn Frame;
-
-    /// 入栈
-    fn push(&self, frame: dyn Frame);
-
     /// 获取当前栈顶指针
-    fn top(&self) -> &dyn Frame;
+    fn top(&self) -> *mut c_void;
 
     /// 获取当前栈底部指针
-    fn bottom(&self) -> &dyn Frame;
+    fn bottom(&self) -> *mut c_void;
 
     /// 栈的总大小
     fn size(&self) -> usize;
@@ -51,26 +33,28 @@ pub trait Stack {
 }
 
 pub trait MainCoroutine {
-    /// 创建一个主协程
-    fn create() -> Self;
-
     /// 将执行权交给另一个非主协程
-    fn resume(coroutine: &dyn Coroutine);
+    fn resume(&self, coroutine: Box<dyn Coroutine>);
 
     /// 销毁协程
-    fn destroy(coroutine: &dyn Coroutine);
+    fn destroy(&self, coroutine: Box<dyn Coroutine>);
 
     /// 主协程执行完毕
     fn exit(&self);
 }
 
-pub trait Coroutine {
-    /// 创建一个协程
-    fn create(main: Option<&dyn MainCoroutine>,
-              stack: &dyn Stack,
-              function: dyn FnOnce<dyn Any>,
-              param_pointer: usize) -> Self;
+pub enum State {
+    /// 已创建
+    Created,
+    /// 运行中
+    Running,
+    /// 被挂起
+    Suspend,
+    /// 已退出
+    Exited,
+}
 
+pub trait Coroutine {
     /// 非主协程将执行权交还给主协程
     fn yields(&self);
 
@@ -78,13 +62,16 @@ pub trait Coroutine {
     fn exit(&self);
 
     /// 获取协程的当前状态
-    fn state(&self);
+    fn get_state(&self) -> Ref<State>;
+
+    /// 获取主协程
+    fn get_main_coroutine(&self) -> &dyn MainCoroutine;
 
     /// 设置协程参数
-    fn set_param(&self, param_pointer: usize);
+    fn set_param(&mut self, param_pointer: usize);
 
     /// 获取协程参数
-    fn get_param(&self) -> usize;
+    fn get_param(&self) -> Option<usize>;
 }
 
 /// hook系统调用，此功能仅对付费用户开放，注意加密
@@ -92,7 +79,7 @@ pub trait Coroutine {
 /// //这样可以拿到系统函数
 /// let read = unsafe { libc::dlsym(libc::RTLD_NEXT, "read".as_ptr() as *const _) };
 /// ```
-pub trait SystemCallHooker {
+pub trait SystemCallHooks {
     fn hook_system_call(name: &str);
 
     fn hook_sleep();
