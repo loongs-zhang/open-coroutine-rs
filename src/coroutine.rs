@@ -1,7 +1,8 @@
 use std::any::Any;
 use std::cell::{Ref, RefCell};
 use std::rc::Rc;
-use crate::{Coroutine, MainCoroutine, Stack, State};
+use crate::api::{Coroutine, MainCoroutine, State};
+use crate::Stack;
 
 struct MainCoroutineImpl {}
 
