@@ -1,5 +1,7 @@
 use std::cell::Ref;
+use crate::register::Register;
 
+#[derive(PartialEq, Copy, Clone)]
 pub enum State {
     /// 已创建
     Created,
@@ -12,6 +14,9 @@ pub enum State {
 }
 
 pub trait MainCoroutine {
+    /// 获取物理寄存器
+    fn get_register(&self) -> &Register;
+
     /// 将执行权交给另一个非主协程
     fn resume(&self, coroutine: Box<dyn Coroutine>);
 
@@ -23,6 +28,9 @@ pub trait MainCoroutine {
 }
 
 pub trait Coroutine {
+    /// 获取物理寄存器
+    fn get_register(&self) -> &Register;
+
     /// 非主协程将执行权交还给主协程
     fn yields(&self);
 
@@ -30,7 +38,7 @@ pub trait Coroutine {
     fn exit(&self);
 
     /// 获取协程的当前状态
-    fn get_state(&self) -> Ref<State>;
+    fn get_state(&self) -> State;
 
     /// 获取主协程
     fn get_main_coroutine(&self) -> &dyn MainCoroutine;

@@ -1,20 +1,35 @@
 use std::any::Any;
 use std::cell::{Ref, RefCell};
+use std::ops::Deref;
 use std::rc::Rc;
 use crate::api::{Coroutine, MainCoroutine, State};
-use crate::Stack;
+use crate::register::Register;
+use crate::{register, Stack};
 
-struct MainCoroutineImpl {}
+struct MainCoroutineImpl {
+    /// 寄存器
+    register: Register,
+}
 
 impl MainCoroutineImpl {
     fn new() -> Self {
-        MainCoroutineImpl {}
+        MainCoroutineImpl { register: Register::new() }
     }
 }
 
 impl MainCoroutine for MainCoroutineImpl {
+    fn get_register(&self) -> &Register {
+        &self.register
+    }
+
     fn resume(&self, coroutine: Box<dyn Coroutine>) {
-        todo!()
+        if coroutine.get_state() == State::Exited {
+            // 不能resume到已退出的协程
+            return;
+        }
+        let mut from = *self.register;
+        let to = coroutine.get_register();
+        unsafe { register::swap(&mut from, to) }
     }
 
     fn destroy(&self, coroutine: Box<dyn Coroutine>) {
@@ -28,7 +43,7 @@ struct CoroutineImpl {
     /// 主协程
     main: Box<dyn MainCoroutine>,
     /// 寄存器
-    register: [usize; 32],
+    register: Register,
     /// 独有栈
     stack: Box<dyn Stack>,
     /// 指向参数的指针
@@ -46,7 +61,7 @@ impl CoroutineImpl {
            param_pointer: Option<usize>) -> Self {
         CoroutineImpl {
             main,
-            register: [0; 32],
+            register: Register::new(),
             stack,
             param: param_pointer,
             state: Rc::new(RefCell::new(State::Created)),
@@ -56,17 +71,23 @@ impl CoroutineImpl {
 }
 
 impl Coroutine for CoroutineImpl {
+    fn get_register(&self) -> &Register {
+        &self.register
+    }
+
     fn yields(&self) {
-        todo!()
+        let mut from = *self.register;
+        let to = self.main.get_register();
+        unsafe { register::swap(&mut from, to) }
     }
 
     fn exit(&self) {
-        self.yields();
         *self.state.borrow_mut() = State::Exited;
+        self.yields();
     }
 
-    fn get_state(&self) -> Ref<State> {
-        return self.state.borrow();
+    fn get_state(&self) -> State {
+        return *self.state.borrow();
     }
 
     fn get_main_coroutine(&self) -> &dyn MainCoroutine {

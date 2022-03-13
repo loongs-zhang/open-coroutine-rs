@@ -5,6 +5,7 @@ use std::ptr::NonNull;
 use std::rc::Rc;
 
 pub mod api;
+mod register;
 pub mod coroutine;
 
 pub trait Stack {
