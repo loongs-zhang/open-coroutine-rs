@@ -1,104 +1,157 @@
-use std::any::Any;
-use std::cell::{Ref, RefCell};
-use std::ops::Deref;
-use std::rc::Rc;
-use crate::api::{Coroutine, MainCoroutine, State};
-use crate::register::Register;
-use crate::{register, Stack};
+use std::os::raw::c_void;
+use std::ptr;
+use crate::context::{Context, Transfer};
+use crate::stack::{ProtectedFixedSizeStack, Stack};
 
-struct MainCoroutineImpl {
-    /// 寄存器
-    register: Register,
+pub type Function = fn(param: Option<*mut c_void>) -> Option<*mut c_void>;
+
+#[derive(Debug)]
+pub struct Coroutine<'a> {
+    stack: &'a Stack,
+    sp: Transfer,
+    //用户函数
+    proc: Function,
+    //调用用户函数的参数
+    param: Option<*mut c_void>,
+    //上下文切换栈，方便用户在N个协程中任意切换
+    context_stack: Vec<&'a Coroutine<'a>>,
 }
 
-impl MainCoroutineImpl {
-    fn new() -> Self {
-        MainCoroutineImpl { register: Register::new() }
-    }
-}
-
-impl MainCoroutine for MainCoroutineImpl {
-    fn get_register(&self) -> &Register {
-        &self.register
-    }
-
-    fn resume(&self, coroutine: Box<dyn Coroutine>) {
-        if coroutine.get_state() == State::Exited {
-            // 不能resume到已退出的协程
-            return;
+extern "C" fn coroutine_function(mut t: Transfer) {
+    unsafe {
+        loop {
+            let context = t.data as *mut Coroutine;
+            let param = (*context).param as Option<*mut c_void>;
+            match param {
+                Some(data) => { print!("coroutine_function {} => ", data as usize) }
+                None => { print!("coroutine_function no param => ") }
+            }
+            // copy stack
+            let mut context_stack: Vec<&Coroutine> = Vec::new();
+            unsafe {
+                for data in (*context).context_stack.iter() {
+                    context_stack.push(data);
+                }
+            }
+            context_stack.push(&*context);
+            let mut new_context = Coroutine::init((*context).stack, (*context).proc, context_stack);
+            //调用用户函数
+            let func = (*context).proc;
+            new_context.param = func(param);
+            //调用完用户函数后，需要清理context_stack
+            new_context.context_stack.pop();
+            t = t.resume(&mut new_context as *mut Coroutine as *mut c_void);
         }
-        let mut from = *self.register;
-        let to = coroutine.get_register();
-        unsafe { register::swap(&mut from, to) }
     }
-
-    fn destroy(&self, coroutine: Box<dyn Coroutine>) {
-        todo!()
-    }
-
-    fn exit(&self) {}
 }
 
-struct CoroutineImpl {
-    /// 主协程
-    main: Box<dyn MainCoroutine>,
-    /// 寄存器
-    register: Register,
-    /// 独有栈
-    stack: Box<dyn Stack>,
-    /// 指向参数的指针
-    param: Option<usize>,
-    /// 协程状态
-    state: Rc<RefCell<State>>,
-    /// 函数指针
-    function: Box<dyn FnOnce(dyn Any) -> ()>,
-}
+impl<'a> Coroutine<'a> {
+    pub fn new(stack: &'a Stack, proc: Function) -> Self {
+        Coroutine::init(stack, proc, Vec::new())
+    }
 
-impl CoroutineImpl {
-    fn new(main: Box<dyn MainCoroutine>,
-           stack: Box<dyn Stack>,
-           function: Box<dyn FnOnce(dyn Any) -> ()>,
-           param_pointer: Option<usize>) -> Self {
-        CoroutineImpl {
-            main,
-            register: Register::new(),
+    fn init(stack: &'a Stack, proc: Function, context_stack: Vec<&'a Coroutine<'a>>) -> Self {
+        let inner = Context::new(stack, coroutine_function);
+        // Allocate a Context on the stack.
+        let mut sp = Transfer::new(inner, 0 as *mut c_void);
+        let mut context = Coroutine {
             stack,
-            param: param_pointer,
-            state: Rc::new(RefCell::new(State::Created)),
-            function,
+            sp,
+            proc,
+            param: None,
+            context_stack,
+        };
+        context.sp.data = &mut context as *mut Coroutine as *mut c_void;
+        context
+    }
+
+    pub fn set_param(&mut self, param: Option<*mut c_void>) {
+        unsafe {
+            let context = self.sp.data as *mut Coroutine;
+            (*context).param = param;
         }
+    }
+
+    pub fn yields(&mut self) -> Self {
+        //没有参数
+        self.resume(None)
+    }
+
+    pub fn resume(&mut self, param: Option<*mut c_void>) -> Self {
+        self.set_param(param);
+        let mut sp = self.sp.resume(self.sp.data);
+        let context = sp.data as *mut Coroutine;
+        let mut context_stack: Vec<&Coroutine> = Vec::new();
+        unsafe {
+            for data in (*context).context_stack.iter() {
+                context_stack.push(data);
+            }
+        }
+        Coroutine {
+            stack: self.stack,
+            sp,
+            proc: self.proc,
+            param: None,
+            context_stack,
+        }
+    }
+
+    pub fn switch(&self, to: &Coroutine) -> Self {
+        let mut sp = Transfer::switch(&to.sp);
+        let context = sp.data as *mut Coroutine;
+        let mut context_stack: Vec<&Coroutine> = Vec::new();
+        unsafe {
+            for data in (*context).context_stack.iter() {
+                context_stack.push(data);
+            }
+        }
+        Coroutine {
+            stack: self.stack,
+            sp,
+            proc: self.proc,
+            param: None,
+            context_stack,
+        }
+    }
+
+    pub fn get_result(&self) -> Option<*mut c_void> {
+        let context = self.sp.data as *mut Coroutine;
+        unsafe { (*context).param }
     }
 }
 
-impl Coroutine for CoroutineImpl {
-    fn get_register(&self) -> &Register {
-        &self.register
+#[cfg(test)]
+mod tests {
+    use std::os::raw::c_void;
+    use crate::coroutine::Coroutine;
+    use crate::stack::ProtectedFixedSizeStack;
+
+    fn user_function(param: Option<*mut c_void>) -> Option<*mut c_void> {
+        match param {
+            Some(param) => {
+                print!("user_function {} => ", param as usize);
+            }
+            None => {
+                print!("user_function no param => ");
+            }
+        }
+        param
     }
 
-    fn yields(&self) {
-        let mut from = *self.register;
-        let to = self.main.get_register();
-        unsafe { register::swap(&mut from, to) }
-    }
-
-    fn exit(&self) {
-        *self.state.borrow_mut() = State::Exited;
-        self.yields();
-    }
-
-    fn get_state(&self) -> State {
-        return *self.state.borrow();
-    }
-
-    fn get_main_coroutine(&self) -> &dyn MainCoroutine {
-        &*self.main
-    }
-
-    fn set_param(&mut self, param_pointer: usize) {
-        self.param = Some(param_pointer);
-    }
-
-    fn get_param(&self) -> Option<usize> {
-        self.param
+    #[test]
+    fn test() {
+        println!("context test started !");
+        let stack = ProtectedFixedSizeStack::new(2048)
+            .expect("allocate stack failed !");
+        let mut c = Coroutine::new(&stack, user_function);
+        for i in 0..10 {
+            print!("Resuming {} => ", i);
+            c = c.resume(Some(i as *mut c_void));
+            match c.get_result() {
+                Some(result) => { println!("Got {}", result as usize) }
+                None => { println!("No result") }
+            }
+        }
+        println!("context test finished!");
     }
 }
