@@ -64,7 +64,11 @@ impl<'a, F> Coroutine<'a, F>
         context.sp.data = &mut context as *mut Coroutine<F> as *mut c_void;
         context
     }
+}
 
+impl<'a, F> Coroutine<'a, F>
+    where F: Copy
+{
     pub fn set_param(&mut self, param: Option<*mut c_void>) {
         unsafe {
             let context = self.sp.data as *mut Coroutine<F>;
