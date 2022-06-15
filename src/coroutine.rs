@@ -3,55 +3,55 @@ use std::ptr;
 use crate::context::{Context, Transfer};
 use crate::stack::{ProtectedFixedSizeStack, Stack};
 
-pub type Function = fn(param: Option<*mut c_void>) -> Option<*mut c_void>;
-
 #[derive(Debug)]
-pub struct Coroutine<'a> {
+pub struct Coroutine<'a, F> {
     stack: &'a Stack,
     sp: Transfer,
     //用户函数
-    proc: Function,
+    proc: F,
     //调用用户函数的参数
     param: Option<*mut c_void>,
     //上下文切换栈，方便用户在N个协程中任意切换
-    context_stack: Vec<&'a Coroutine<'a>>,
+    context_stack: Vec<&'a Coroutine<'a, F>>,
 }
 
-extern "C" fn coroutine_function(mut t: Transfer) {
-    unsafe {
-        loop {
-            let context = t.data as *mut Coroutine;
-            let param = (*context).param as Option<*mut c_void>;
-            match param {
-                Some(data) => { print!("coroutine_function {} => ", data as usize) }
-                None => { print!("coroutine_function no param => ") }
-            }
-            // copy stack
-            let mut context_stack: Vec<&Coroutine> = Vec::new();
-            unsafe {
-                for data in (*context).context_stack.iter() {
-                    context_stack.push(data);
+impl<'a, F> Coroutine<'a, F>
+    where F: FnOnce(Option<*mut c_void>) -> Option<*mut c_void> + Copy
+{
+    extern "C" fn coroutine_function(mut t: Transfer) {
+        unsafe {
+            loop {
+                let context = t.data as *mut Coroutine<F>;
+                let param = (*context).param as Option<*mut c_void>;
+                match param {
+                    Some(data) => { print!("coroutine_function {} => ", data as usize) }
+                    None => { print!("coroutine_function no param => ") }
                 }
+                // copy stack
+                let mut context_stack: Vec<&Coroutine<F>> = Vec::new();
+                unsafe {
+                    for data in (*context).context_stack.iter() {
+                        context_stack.push(data);
+                    }
+                }
+                context_stack.push(&*context);
+                let mut new_context = Coroutine::init((*context).stack, (*context).proc, context_stack);
+                //调用用户函数
+                let func = (*context).proc;
+                new_context.param = func(param);
+                //调用完用户函数后，需要清理context_stack
+                new_context.context_stack.pop();
+                t = t.resume(&mut new_context as *mut Coroutine<F> as *mut c_void);
             }
-            context_stack.push(&*context);
-            let mut new_context = Coroutine::init((*context).stack, (*context).proc, context_stack);
-            //调用用户函数
-            let func = (*context).proc;
-            new_context.param = func(param);
-            //调用完用户函数后，需要清理context_stack
-            new_context.context_stack.pop();
-            t = t.resume(&mut new_context as *mut Coroutine as *mut c_void);
         }
     }
-}
 
-impl<'a> Coroutine<'a> {
-    pub fn new(stack: &'a Stack, proc: Function) -> Self {
+    pub fn new(stack: &'a Stack, proc: F) -> Self {
         Coroutine::init(stack, proc, Vec::new())
     }
 
-    fn init(stack: &'a Stack, proc: Function, context_stack: Vec<&'a Coroutine<'a>>) -> Self {
-        let inner = Context::new(stack, coroutine_function);
+    fn init(stack: &'a Stack, proc: F, context_stack: Vec<&'a Coroutine<'a, F>>) -> Self {
+        let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
         // Allocate a Context on the stack.
         let mut sp = Transfer::new(inner, 0 as *mut c_void);
         let mut context = Coroutine {
@@ -61,13 +61,13 @@ impl<'a> Coroutine<'a> {
             param: None,
             context_stack,
         };
-        context.sp.data = &mut context as *mut Coroutine as *mut c_void;
+        context.sp.data = &mut context as *mut Coroutine<F> as *mut c_void;
         context
     }
 
     pub fn set_param(&mut self, param: Option<*mut c_void>) {
         unsafe {
-            let context = self.sp.data as *mut Coroutine;
+            let context = self.sp.data as *mut Coroutine<F>;
             (*context).param = param;
         }
     }
@@ -80,8 +80,8 @@ impl<'a> Coroutine<'a> {
     pub fn resume(&mut self, param: Option<*mut c_void>) -> Self {
         self.set_param(param);
         let mut sp = self.sp.resume(self.sp.data);
-        let context = sp.data as *mut Coroutine;
-        let mut context_stack: Vec<&Coroutine> = Vec::new();
+        let context = sp.data as *mut Coroutine<F>;
+        let mut context_stack: Vec<&Coroutine<F>> = Vec::new();
         unsafe {
             for data in (*context).context_stack.iter() {
                 context_stack.push(data);
@@ -96,10 +96,10 @@ impl<'a> Coroutine<'a> {
         }
     }
 
-    pub fn switch(&self, to: &Coroutine) -> Self {
+    pub fn switch(&self, to: &Coroutine<F>) -> Self {
         let mut sp = Transfer::switch(&to.sp);
-        let context = sp.data as *mut Coroutine;
-        let mut context_stack: Vec<&Coroutine> = Vec::new();
+        let context = sp.data as *mut Coroutine<F>;
+        let mut context_stack: Vec<&Coroutine<F>> = Vec::new();
         unsafe {
             for data in (*context).context_stack.iter() {
                 context_stack.push(data);
@@ -115,7 +115,7 @@ impl<'a> Coroutine<'a> {
     }
 
     pub fn get_result(&self) -> Option<*mut c_void> {
-        let context = self.sp.data as *mut Coroutine;
+        let context = self.sp.data as *mut Coroutine<F>;
         unsafe { (*context).param }
     }
 }
@@ -126,24 +126,22 @@ mod tests {
     use crate::coroutine::Coroutine;
     use crate::stack::ProtectedFixedSizeStack;
 
-    fn user_function(param: Option<*mut c_void>) -> Option<*mut c_void> {
-        match param {
-            Some(param) => {
-                print!("user_function {} => ", param as usize);
-            }
-            None => {
-                print!("user_function no param => ");
-            }
-        }
-        param
-    }
-
     #[test]
     fn test() {
         println!("context test started !");
         let stack = ProtectedFixedSizeStack::new(2048)
             .expect("allocate stack failed !");
-        let mut c = Coroutine::new(&stack, user_function);
+        let mut c = Coroutine::new(&stack, |param| {
+            match param {
+                Some(param) => {
+                    print!("user_function {} => ", param as usize);
+                }
+                None => {
+                    print!("user_function no param => ");
+                }
+            }
+            param
+        });
         for i in 0..10 {
             print!("Resuming {} => ", i);
             c = c.resume(Some(i as *mut c_void));
