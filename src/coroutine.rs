@@ -8,7 +8,7 @@ pub struct Coroutine<'a, F> {
     stack: &'a Stack,
     sp: Transfer,
     //用户函数
-    proc: F,
+    proc: Box<F>,
     //调用用户函数的参数
     param: Option<*mut c_void>,
     //上下文切换栈，方便用户在N个协程中任意切换
@@ -16,7 +16,7 @@ pub struct Coroutine<'a, F> {
 }
 
 impl<'a, F> Coroutine<'a, F>
-    where F: FnOnce(Option<*mut c_void>) -> Option<*mut c_void> + Copy
+    where F: FnOnce(Option<*mut c_void>) -> Option<*mut c_void>
 {
     extern "C" fn coroutine_function(mut t: Transfer) {
         unsafe {
@@ -35,9 +35,10 @@ impl<'a, F> Coroutine<'a, F>
                     }
                 }
                 context_stack.push(&*context);
-                let mut new_context = Coroutine::init((*context).stack, (*context).proc, context_stack);
+                let mut func = ptr::read((*context).proc.as_ref());
+                let mut new_context = Coroutine::init((*context).stack, Box::new(func), context_stack);
                 //调用用户函数
-                let func = (*context).proc;
+                func = ptr::read((*context).proc.as_ref());
                 new_context.param = func(param);
                 //调用完用户函数后，需要清理context_stack
                 new_context.context_stack.pop();
@@ -47,10 +48,10 @@ impl<'a, F> Coroutine<'a, F>
     }
 
     pub fn new(stack: &'a Stack, proc: F) -> Self {
-        Coroutine::init(stack, proc, Vec::new())
+        Coroutine::init(stack, Box::new(proc), Vec::new())
     }
 
-    fn init(stack: &'a Stack, proc: F, context_stack: Vec<&'a Coroutine<'a, F>>) -> Self {
+    fn init(stack: &'a Stack, proc: Box<F>, context_stack: Vec<&'a Coroutine<'a, F>>) -> Self {
         let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
         // Allocate a Context on the stack.
         let mut sp = Transfer::new(inner, 0 as *mut c_void);
@@ -66,9 +67,7 @@ impl<'a, F> Coroutine<'a, F>
     }
 }
 
-impl<'a, F> Coroutine<'a, F>
-    where F: Copy
-{
+impl<'a, F> Coroutine<'a, F> {
     pub fn set_param(&mut self, param: Option<*mut c_void>) {
         unsafe {
             let context = self.sp.data as *mut Coroutine<F>;
@@ -94,7 +93,7 @@ impl<'a, F> Coroutine<'a, F>
         Coroutine {
             stack: self.stack,
             sp,
-            proc: self.proc,
+            proc: Box::new(unsafe { ptr::read(self.proc.as_ref()) }),
             param: None,
             context_stack,
         }
@@ -112,7 +111,7 @@ impl<'a, F> Coroutine<'a, F>
         Coroutine {
             stack: self.stack,
             sp,
-            proc: self.proc,
+            proc: Box::new(unsafe { ptr::read(self.proc.as_ref()) }),
             param: None,
             context_stack,
         }
