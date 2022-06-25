@@ -11,6 +11,8 @@ pub struct Coroutine<'a, F> {
     proc: Box<F>,
     //调用用户函数的参数
     param: Option<*mut c_void>,
+    //调用用户函数的结果
+    result: Option<*mut c_void>,
     //上下文切换栈，方便用户在N个协程中任意切换
     context_stack: Vec<&'a Coroutine<'a, F>>,
 }
@@ -39,9 +41,10 @@ impl<'a, F> Coroutine<'a, F>
                 let mut new_context = Coroutine::init((*context).stack, Box::new(func), context_stack);
                 //调用用户函数
                 func = ptr::read((*context).proc.as_ref());
-                new_context.param = func(param);
-                //调用完用户函数后，需要清理context_stack
-                new_context.context_stack.pop();
+                new_context.set_param(param)
+                    .set_result(func(param))
+                    //调用完用户函数后，需要清理context_stack
+                    .context_stack.pop();
                 t = t.resume(&mut new_context as *mut Coroutine<F> as *mut c_void);
             }
         }
@@ -60,6 +63,7 @@ impl<'a, F> Coroutine<'a, F>
             sp,
             proc,
             param: None,
+            result: None,
             context_stack,
         };
         context.sp.data = &mut context as *mut Coroutine<F> as *mut c_void;
@@ -68,58 +72,65 @@ impl<'a, F> Coroutine<'a, F>
 }
 
 impl<'a, F> Coroutine<'a, F> {
-    pub fn set_param(&mut self, param: Option<*mut c_void>) {
+    pub fn yields(&mut self) -> Self {
+        //没有用户参数，直接切换上下文
+        self.switch(&self.sp)
+    }
+
+    pub fn resume(&mut self, param: Option<*mut c_void>) -> Self {
+        //设置用户参数
+        self.set_param(param);
+        //切换上下文
+        self.switch(&self.sp)
+    }
+
+    pub fn switch_to(&self, to: &Coroutine<F>) -> Self {
+        self.switch(&to.sp)
+    }
+
+    fn switch(&self, to: &Transfer) -> Self {
+        let mut sp = Transfer::switch(to);
+        let context = sp.data as *mut Coroutine<F>;
+        let mut context_stack: Vec<&Coroutine<F>> = Vec::new();
+        unsafe {
+            for data in (*context).context_stack.iter() {
+                context_stack.push(data);
+            }
+            Coroutine {
+                stack: self.stack,
+                sp,
+                proc: Box::new(unsafe { ptr::read(self.proc.as_ref()) }),
+                param: (*context).param,
+                result: (*context).result,
+                context_stack,
+            }
+        }
+    }
+
+    pub fn set_param(&mut self, param: Option<*mut c_void>) -> &mut Self {
         unsafe {
             let context = self.sp.data as *mut Coroutine<F>;
             (*context).param = param;
         }
+        self
     }
 
-    pub fn yields(&mut self) -> Self {
-        //没有参数
-        self.resume(None)
+    pub fn get_param(&self) -> Option<*mut c_void> {
+        let context = self.sp.data as *mut Coroutine<F>;
+        unsafe { (*context).param }
     }
 
-    pub fn resume(&mut self, param: Option<*mut c_void>) -> Self {
-        self.set_param(param);
-        let mut sp = self.sp.resume(self.sp.data);
-        let context = sp.data as *mut Coroutine<F>;
-        let mut context_stack: Vec<&Coroutine<F>> = Vec::new();
+    pub fn set_result(&mut self, result: Option<*mut c_void>) -> &mut Self {
         unsafe {
-            for data in (*context).context_stack.iter() {
-                context_stack.push(data);
-            }
+            let context = self.sp.data as *mut Coroutine<F>;
+            (*context).result = result;
         }
-        Coroutine {
-            stack: self.stack,
-            sp,
-            proc: Box::new(unsafe { ptr::read(self.proc.as_ref()) }),
-            param: None,
-            context_stack,
-        }
-    }
-
-    pub fn switch(&self, to: &Coroutine<F>) -> Self {
-        let mut sp = Transfer::switch(&to.sp);
-        let context = sp.data as *mut Coroutine<F>;
-        let mut context_stack: Vec<&Coroutine<F>> = Vec::new();
-        unsafe {
-            for data in (*context).context_stack.iter() {
-                context_stack.push(data);
-            }
-        }
-        Coroutine {
-            stack: self.stack,
-            sp,
-            proc: Box::new(unsafe { ptr::read(self.proc.as_ref()) }),
-            param: None,
-            context_stack,
-        }
+        self
     }
 
     pub fn get_result(&self) -> Option<*mut c_void> {
         let context = self.sp.data as *mut Coroutine<F>;
-        unsafe { (*context).param }
+        unsafe { (*context).result }
     }
 }
 
