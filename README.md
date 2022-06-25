@@ -6,7 +6,7 @@
 
 2. c/c++
    
-   [acl](https://github.com/acl-dev/acl)中的lib_fiber模块，
+   [acl](https://github.com/acl-dev/acl)中的lib_fiber模块
    
    [sc](https://github.com/rhoot/sc)
    
