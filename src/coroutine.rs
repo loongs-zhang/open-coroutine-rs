@@ -72,19 +72,19 @@ impl<'a, F> Coroutine<'a, F>
 }
 
 impl<'a, F> Coroutine<'a, F> {
-    pub fn yields(&mut self) -> Self {
+    pub fn resume(&mut self) -> Self {
         //没有用户参数，直接切换上下文
         self.switch(&self.sp)
     }
 
-    pub fn resume(&mut self, param: Option<*mut c_void>) -> Self {
+    pub fn resume_with(&mut self, param: Option<*mut c_void>) -> Self {
         //设置用户参数
         self.set_param(param);
         //切换上下文
         self.switch(&self.sp)
     }
 
-    pub fn switch_to(&self, to: &Coroutine<F>) -> Self {
+    pub fn resume_to(&self, to: &Coroutine<F>) -> Self {
         self.switch(&to.sp)
     }
 
@@ -158,7 +158,7 @@ mod tests {
         });
         for i in 0..10 {
             print!("Resuming {} => ", i);
-            c = c.resume(Some(i as *mut c_void));
+            c = c.resume_with(Some(i as *mut c_void));
             match c.get_result() {
                 Some(result) => { println!("Got {}", result as usize) }
                 None => { println!("No result") }
