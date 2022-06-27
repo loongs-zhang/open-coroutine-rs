@@ -13,8 +13,6 @@ pub struct Coroutine<'a, F> {
     param: Option<*mut c_void>,
     //调用用户函数的结果
     result: Option<*mut c_void>,
-    //上下文切换栈，方便用户在N个协程中任意切换
-    context_stack: Vec<&'a Coroutine<'a, F>>,
 }
 
 impl<'a, F> Coroutine<'a, F>
@@ -29,32 +27,21 @@ impl<'a, F> Coroutine<'a, F>
                     Some(data) => { print!("coroutine_function {} => ", data as usize) }
                     None => { print!("coroutine_function no param => ") }
                 }
-                // copy stack
-                let mut context_stack: Vec<&Coroutine<F>> = Vec::new();
-                unsafe {
-                    for data in (*context).context_stack.iter() {
-                        context_stack.push(data);
-                    }
-                }
-                context_stack.push(&*context);
                 let mut func = ptr::read((*context).proc.as_ref());
-                let mut new_context = Coroutine::init((*context).stack, Box::new(func), context_stack);
+                let mut new_context = Coroutine::init((*context).stack, Box::new(func), param);
                 //调用用户函数
                 func = ptr::read((*context).proc.as_ref());
-                new_context.set_param(param)
-                    .set_result(func(param))
-                    //调用完用户函数后，需要清理context_stack
-                    .context_stack.pop();
+                new_context.set_result(func(param));
                 t = t.resume(&mut new_context as *mut Coroutine<F> as *mut c_void);
             }
         }
     }
 
-    pub fn new(stack: &'a Stack, proc: F) -> Self {
-        Coroutine::init(stack, Box::new(proc), Vec::new())
+    pub fn new(stack: &'a Stack, proc: F, param: Option<*mut c_void>) -> Self {
+        Coroutine::init(stack, Box::new(proc), param)
     }
 
-    fn init(stack: &'a Stack, proc: Box<F>, context_stack: Vec<&'a Coroutine<'a, F>>) -> Self {
+    fn init(stack: &'a Stack, proc: Box<F>, param: Option<*mut c_void>) -> Self {
         let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
         // Allocate a Context on the stack.
         let mut sp = Transfer::new(inner, 0 as *mut c_void);
@@ -62,9 +49,8 @@ impl<'a, F> Coroutine<'a, F>
             stack,
             sp,
             proc,
-            param: None,
+            param,
             result: None,
-            context_stack,
         };
         context.sp.data = &mut context as *mut Coroutine<F> as *mut c_void;
         context
@@ -91,20 +77,7 @@ impl<'a, F> Coroutine<'a, F> {
     fn switch(&self, to: &Transfer) -> Self {
         let mut sp = Transfer::switch(to);
         let context = sp.data as *mut Coroutine<F>;
-        let mut context_stack: Vec<&Coroutine<F>> = Vec::new();
-        unsafe {
-            for data in (*context).context_stack.iter() {
-                context_stack.push(data);
-            }
-            Coroutine {
-                stack: self.stack,
-                sp,
-                proc: Box::new(unsafe { ptr::read(self.proc.as_ref()) }),
-                param: (*context).param,
-                result: (*context).result,
-                context_stack,
-            }
-        }
+        unsafe { ptr::read(context) }
     }
 
     pub fn set_param(&mut self, param: Option<*mut c_void>) -> &mut Self {
@@ -155,7 +128,7 @@ mod tests {
                 }
             }
             param
-        });
+        }, None);
         for i in 0..10 {
             print!("Resuming {} => ", i);
             c = c.resume_with(Some(i as *mut c_void));
