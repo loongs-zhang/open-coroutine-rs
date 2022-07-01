@@ -32,6 +32,7 @@ impl<'a, F> Coroutine<'a, F>
                 //调用用户函数
                 func = ptr::read((*context).proc.as_ref());
                 new_context.set_result(func(param));
+                //todo 不回跳，继续执行下一个ready的协程
                 t = t.resume(&mut new_context as *mut Coroutine<F> as *mut c_void);
             }
         }
@@ -39,6 +40,7 @@ impl<'a, F> Coroutine<'a, F>
 
     pub fn new(stack: &'a Stack, proc: F, param: Option<*mut c_void>) -> Self {
         Coroutine::init(stack, Box::new(proc), param)
+        //todo 加到ready队列中，status再置为ready
     }
 
     fn init(stack: &'a Stack, proc: Box<F>, param: Option<*mut c_void>) -> Self {
@@ -105,6 +107,10 @@ impl<'a, F> Coroutine<'a, F> {
         let context = self.sp.data as *mut Coroutine<F>;
         unsafe { (*context).result }
     }
+
+    pub fn exit(&self) {
+        self.stack.drop();
+    }
 }
 
 #[cfg(test)]
@@ -137,6 +143,7 @@ mod tests {
                 None => { println!("No result") }
             }
         }
+        c.exit();
         println!("context test finished!");
     }
 }
