@@ -181,6 +181,10 @@ impl FixedSizeStack {
     pub fn new(size: usize) -> Result<FixedSizeStack, StackError> {
         Stack::allocate(size, false).map(FixedSizeStack)
     }
+
+    pub fn drop(&self) {
+        self.0.drop();
+    }
 }
 
 impl Deref for FixedSizeStack {
@@ -195,12 +199,6 @@ impl Default for FixedSizeStack {
     fn default() -> FixedSizeStack {
         FixedSizeStack::new(Stack::default_size())
             .unwrap_or_else(|err| panic!("Failed to allocate FixedSizeStack with {:?}", err))
-    }
-}
-
-impl Drop for FixedSizeStack {
-    fn drop(&mut self) {
-        self.0.drop();
     }
 }
 
@@ -225,6 +223,10 @@ impl ProtectedFixedSizeStack {
     pub fn new(size: usize) -> Result<ProtectedFixedSizeStack, StackError> {
         Stack::allocate(size, true).map(ProtectedFixedSizeStack)
     }
+
+    pub fn drop(&self) {
+        self.0.drop();
+    }
 }
 
 impl Deref for ProtectedFixedSizeStack {
@@ -240,12 +242,6 @@ impl Default for ProtectedFixedSizeStack {
         ProtectedFixedSizeStack::new(Stack::default_size()).unwrap_or_else(|err| {
             panic!("Failed to allocate ProtectedFixedSizeStack with {:?}", err)
         })
-    }
-}
-
-impl Drop for ProtectedFixedSizeStack {
-    fn drop(&mut self) {
-        self.0.drop();
     }
 }
 
@@ -267,6 +263,7 @@ mod tests {
         assert_eq!(stack.len(), sys::min_stack_size());
 
         unsafe { write_bytes(stack.bottom() as *mut u8, 0x1d, stack.len()) };
+        stack.drop();
     }
 
     #[test]
