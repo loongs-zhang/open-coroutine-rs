@@ -28,7 +28,7 @@ impl Display for StackError {
         match *self {
             StackError::ExceedsMaximumSize(size) => {
                 write!(fmt, "Requested more than max size of {} bytes for a stack", size)
-            },
+            }
             StackError::IoError(ref e) => e.fmt(fmt),
         }
     }
@@ -57,6 +57,7 @@ impl Error for StackError {
 pub struct Stack {
     top: *mut c_void,
     bottom: *mut c_void,
+    protected: bool,
 }
 
 impl Stack {
@@ -65,12 +66,15 @@ impl Stack {
     /// It is unsafe because it is your reponsibility to make sure that `top` and `buttom` are valid
     /// addresses.
     #[inline]
-    pub unsafe fn new(top: *mut c_void, bottom: *mut c_void) -> Stack {
+    pub unsafe fn new(top: *mut c_void,
+                      bottom: *mut c_void,
+                      protected: bool) -> Stack {
         debug_assert!(top >= bottom);
 
         Stack {
             top,
             bottom,
+            protected,
         }
     }
 
@@ -144,6 +148,19 @@ impl Stack {
 
         Err(StackError::ExceedsMaximumSize(max_stack_size - add))
     }
+
+    pub(crate) fn drop(&self) {
+        unsafe {
+            let mut ptr = self.bottom();
+            let mut size = self.len();
+            if self.protected {
+                let page_size = sys::page_size();
+                ptr = (self.bottom() as usize - page_size) as *mut c_void;
+                size = self.len() + page_size;
+            }
+            sys::deallocate_stack(ptr, size);
+        }
+    }
 }
 
 unsafe impl Send for Stack {}
@@ -183,9 +200,7 @@ impl Default for FixedSizeStack {
 
 impl Drop for FixedSizeStack {
     fn drop(&mut self) {
-        unsafe {
-            sys::deallocate_stack(self.0.bottom(), self.0.len());
-        }
+        self.0.drop();
     }
 }
 
@@ -230,12 +245,7 @@ impl Default for ProtectedFixedSizeStack {
 
 impl Drop for ProtectedFixedSizeStack {
     fn drop(&mut self) {
-        let page_size = sys::page_size();
-        let guard = (self.0.bottom() as usize - page_size) as *mut c_void;
-        let size_with_guard = self.0.len() + page_size;
-        unsafe {
-            sys::deallocate_stack(guard, size_with_guard);
-        }
+        self.0.drop();
     }
 }
 
