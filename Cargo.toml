@@ -7,6 +7,8 @@ edition = "2021"
 
 [dependencies]
 libc = "0.2.119"
+#使用内存池快速分配/释放对象
+bumpalo = { version = "3.10.0", features = ["boxed", "collections", "allocator_api"] }
 
 [target."cfg(windows)".dependencies.kernel32-sys]
 version = "0.2.2"

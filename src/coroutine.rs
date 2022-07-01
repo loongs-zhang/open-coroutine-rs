@@ -3,10 +3,31 @@ use std::ptr;
 use crate::context::{Context, Transfer};
 use crate::stack::{ProtectedFixedSizeStack, Stack};
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum Status {
+    ///协程被创建
+    Created,
+    ///等待运行
+    Ready,
+    ///运行中
+    Running,
+    ///被挂起
+    Suspend,
+    ///执行系统调用
+    SystemCall,
+    ///栈扩/缩容时
+    CopyStack,
+    ///调用用户函数完成，但未退出
+    Finished,
+    ///已退出
+    Exited,
+}
+
 #[derive(Debug)]
 pub struct Coroutine<'a, F> {
     stack: &'a Stack,
     sp: Transfer,
+    status: Status,
     //用户函数
     proc: Box<F>,
     //调用用户函数的参数
@@ -22,13 +43,17 @@ impl<'a, F> Coroutine<'a, F>
         unsafe {
             loop {
                 let context = t.data as *mut Coroutine<F>;
+                //设置协程状态为运行中
+                (*context).status = Status::Running;
                 let param = (*context).param as Option<*mut c_void>;
                 match param {
                     Some(data) => { print!("coroutine_function {} => ", data as usize) }
                     None => { print!("coroutine_function no param => ") }
                 }
                 let mut func = ptr::read((*context).proc.as_ref());
-                let mut new_context = Coroutine::init((*context).stack, Box::new(func), param);
+                let mut new_context = Coroutine::init(
+                    //设置协程状态为已完成，resume的时候，已经调用完了用户函数
+                    (*context).stack, Status::Finished, Box::new(func), param);
                 //调用用户函数
                 func = ptr::read((*context).proc.as_ref());
                 new_context.set_result(func(param));
@@ -39,17 +64,18 @@ impl<'a, F> Coroutine<'a, F>
     }
 
     pub fn new(stack: &'a Stack, proc: F, param: Option<*mut c_void>) -> Self {
-        Coroutine::init(stack, Box::new(proc), param)
+        Coroutine::init(stack, Status::Created, Box::new(proc), param)
         //todo 加到ready队列中，status再置为ready
     }
 
-    fn init(stack: &'a Stack, proc: Box<F>, param: Option<*mut c_void>) -> Self {
+    fn init(stack: &'a Stack, status: Status, proc: Box<F>, param: Option<*mut c_void>) -> Self {
         let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
         // Allocate a Context on the stack.
         let mut sp = Transfer::new(inner, 0 as *mut c_void);
         let mut context = Coroutine {
             stack,
             sp,
+            status,
             proc,
             param,
             result: None,
@@ -108,7 +134,13 @@ impl<'a, F> Coroutine<'a, F> {
         unsafe { (*context).result }
     }
 
-    pub fn exit(&self) {
+    pub fn get_status(&self) -> Status {
+        let context = self.sp.data as *mut Coroutine<F>;
+        unsafe { (*context).status }
+    }
+
+    pub fn exit(&mut self) {
+        self.status = Status::Exited;
         self.stack.drop();
     }
 }
