@@ -9,6 +9,7 @@ use crate::timer;
 pub struct Scheduler<F> {
     ready: LinkedList<Coroutine<F>>,
     running: Option<Coroutine<F>>,
+    //todo 重构时间轮，只要list就可以了
     suspend: BTreeMap<u64, LinkedList<Coroutine<F>>>,
     //not support for now
     system_call: LinkedList<Coroutine<F>>,
@@ -79,7 +80,7 @@ mod tests {
     use std::{mem, thread};
     use std::os::raw::c_void;
     use std::time::Duration;
-    use crate::coroutine::Coroutine;
+    use crate::coroutine::{Coroutine, Status};
     use crate::scheduler::Scheduler;
     use crate::stack::ProtectedFixedSizeStack;
 
@@ -103,7 +104,8 @@ mod tests {
             param
         };
         let mut coroutine = Coroutine::new(&STACK1, closure, Some(1usize as *mut c_void));
-        coroutine.delay(Duration::from_millis(500));
+        coroutine.set_delay(Duration::from_millis(500))
+            .set_status(Status::Suspend);
         scheduler.offer(coroutine);
         scheduler.schedule();
         assert_eq!(0, scheduler.ready.len());

@@ -1,5 +1,5 @@
 use std::os::raw::c_void;
-use std::ptr;
+use std::{ptr, thread};
 use std::time::Duration;
 use crate::context::{Context, Transfer};
 use crate::stack::{ProtectedFixedSizeStack, Stack};
@@ -36,7 +36,7 @@ pub struct Coroutine<F> {
     param: Option<*mut c_void>,
     //调用用户函数的结果
     result: Option<*mut c_void>,
-    //下一次应该执行协程的时间
+    //下一次应该执行协程体的时间
     exec_time: u64,
 }
 
@@ -47,6 +47,11 @@ impl<F> Coroutine<F>
         unsafe {
             loop {
                 let context = t.data as *mut Coroutine<F>;
+                if timer::now() < (*context).exec_time {
+                    //让出CPU的执行权
+                    thread::yield_now();
+                    continue;
+                }
                 //设置协程状态为运行中
                 (*context).status = Status::Running;
                 let param = (*context).param as Option<*mut c_void>;
@@ -114,27 +119,21 @@ impl<F> Coroutine<F> {
         unsafe { ptr::read(context) }
     }
 
-    ///todo 重构时间轮
-    pub fn delay(&mut self, delay: Duration) -> &mut Self {
-        self.status = Status::Suspend;
-        //覆盖执行时间
-        unsafe {
-            let context = self.sp.data as *mut Coroutine<F>;
-            (*context).exec_time = timer::get_timeout_time(delay);
-        }
-        self
+    pub fn delay(&mut self, delay: Duration) -> Self {
+        self.set_delay(delay)
+            .set_status(Status::Suspend)
+            .resume()
     }
 
-    ///todo 重构时间轮
-    pub fn delay_with(&mut self, delay: Duration, param: Option<*mut c_void>) -> &mut Self {
-        self.delay(delay);
-        //覆盖用户参数
-        self.set_param(param);
-        self
+    pub fn delay_with(&mut self, delay: Duration, param: Option<*mut c_void>) -> Self {
+        self.set_delay(delay)
+            .set_status(Status::Suspend)
+            //覆盖用户参数
+            .resume_with(param)
     }
 
     pub fn exit(&mut self) {
-        self.status = Status::Exited;
+        self.set_status(Status::Exited);
         self.stack.drop();
     }
 
@@ -178,6 +177,15 @@ impl<F> Coroutine<F> {
         unsafe { (*context).status }
     }
 
+    pub fn set_delay(&mut self, delay: Duration) -> &mut Self {
+        //覆盖执行时间
+        unsafe {
+            let context = self.sp.data as *mut Coroutine<F>;
+            (*context).exec_time = timer::get_timeout_time(delay);
+        }
+        self
+    }
+
     pub fn get_execute_time(&self) -> u64 {
         let context = self.sp.data as *mut Coroutine<F>;
         unsafe { (*context).exec_time }
@@ -187,6 +195,7 @@ impl<F> Coroutine<F> {
 #[cfg(test)]
 mod tests {
     use std::os::raw::c_void;
+    use std::time::Duration;
     use crate::coroutine::Coroutine;
     use crate::stack::ProtectedFixedSizeStack;
 
@@ -210,7 +219,7 @@ mod tests {
         }, None);
         for i in 0..10 {
             print!("Resuming {} => ", i);
-            c = c.resume_with(Some(i as *mut c_void));
+            c = c.delay_with(Duration::from_millis(100), Some(i as *mut c_void));
             match c.get_result() {
                 Some(result) => { println!("Got {}", result as usize) }
                 None => { println!("No result") }
