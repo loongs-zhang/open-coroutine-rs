@@ -24,8 +24,8 @@ pub enum Status {
 }
 
 #[derive(Debug)]
-pub struct Coroutine<'a, F> {
-    stack: &'a Stack,
+pub struct Coroutine<F> {
+    stack: &'static Stack,
     sp: Transfer,
     status: Status,
     //用户函数
@@ -36,7 +36,7 @@ pub struct Coroutine<'a, F> {
     result: Option<*mut c_void>,
 }
 
-impl<'a, F> Coroutine<'a, F>
+impl<F> Coroutine<F>
     where F: FnOnce(Option<*mut c_void>) -> Option<*mut c_void>
 {
     extern "C" fn coroutine_function(mut t: Transfer) {
@@ -63,12 +63,12 @@ impl<'a, F> Coroutine<'a, F>
         }
     }
 
-    pub fn new(stack: &'a Stack, proc: F, param: Option<*mut c_void>) -> Self {
+    pub fn new(stack: &'static Stack, proc: F, param: Option<*mut c_void>) -> Self {
         Coroutine::init(stack, Status::Created, Box::new(proc), param)
         //todo 加到ready队列中，status再置为ready
     }
 
-    fn init(stack: &'a Stack, status: Status, proc: Box<F>, param: Option<*mut c_void>) -> Self {
+    fn init(stack: &'static Stack, status: Status, proc: Box<F>, param: Option<*mut c_void>) -> Self {
         let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
         // Allocate a Context on the stack.
         let mut sp = Transfer::new(inner, 0 as *mut c_void);
@@ -85,14 +85,14 @@ impl<'a, F> Coroutine<'a, F>
     }
 }
 
-impl<'a, F> Coroutine<'a, F> {
-    pub fn resume(&mut self) -> Self {
-        //没有用户参数，直接切换上下文
+impl<F> Coroutine<F> {
+    pub fn resume(&self) -> Self {
+        //使用构造方法传入的参数，直接切换上下文
         self.switch(&self.sp)
     }
 
     pub fn resume_with(&mut self, param: Option<*mut c_void>) -> Self {
-        //设置用户参数
+        //覆盖用户参数
         self.set_param(param);
         //切换上下文
         self.switch(&self.sp)
@@ -134,6 +134,14 @@ impl<'a, F> Coroutine<'a, F> {
         unsafe { (*context).result }
     }
 
+    pub(crate) fn set_status(&mut self, status: Status) -> &mut Self {
+        unsafe {
+            let context = self.sp.data as *mut Coroutine<F>;
+            (*context).status = status;
+        }
+        self
+    }
+
     pub fn get_status(&self) -> Status {
         let context = self.sp.data as *mut Coroutine<F>;
         unsafe { (*context).status }
@@ -151,12 +159,14 @@ mod tests {
     use crate::coroutine::Coroutine;
     use crate::stack::ProtectedFixedSizeStack;
 
+    lazy_static! {
+        static ref STACK: ProtectedFixedSizeStack = ProtectedFixedSizeStack::new(2048).expect("allocate stack failed !");
+    }
+
     #[test]
     fn test() {
         println!("context test started !");
-        let stack = ProtectedFixedSizeStack::new(2048)
-            .expect("allocate stack failed !");
-        let mut c = Coroutine::new(&stack, |param| {
+        let mut c = Coroutine::new(&STACK, |param| {
             match param {
                 Some(param) => {
                     print!("user_function {} => ", param as usize);

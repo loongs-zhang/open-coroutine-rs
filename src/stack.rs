@@ -60,6 +60,8 @@ pub struct Stack {
     protected: bool,
 }
 
+unsafe impl Sync for Stack {}
+
 impl Stack {
     /// Creates a (non-owning) representation of some stack memory.
     ///
