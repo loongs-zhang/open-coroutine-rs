@@ -1,7 +1,9 @@
 use std::os::raw::c_void;
 use std::ptr;
+use std::time::Duration;
 use crate::context::{Context, Transfer};
 use crate::stack::{ProtectedFixedSizeStack, Stack};
+use crate::timer;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Status {
@@ -34,6 +36,8 @@ pub struct Coroutine<F> {
     param: Option<*mut c_void>,
     //调用用户函数的结果
     result: Option<*mut c_void>,
+    //下一次应该执行协程的时间
+    exec_time: u64,
 }
 
 impl<F> Coroutine<F>
@@ -79,6 +83,8 @@ impl<F> Coroutine<F>
             proc,
             param,
             result: None,
+            //默认轮询到了立刻执行
+            exec_time: 0,
         };
         context.sp.data = &mut context as *mut Coroutine<F> as *mut c_void;
         context
@@ -108,6 +114,31 @@ impl<F> Coroutine<F> {
         unsafe { ptr::read(context) }
     }
 
+    ///todo 重构时间轮
+    pub fn delay(&mut self, delay: Duration) -> &mut Self {
+        self.status = Status::Suspend;
+        //覆盖执行时间
+        unsafe {
+            let context = self.sp.data as *mut Coroutine<F>;
+            (*context).exec_time = timer::get_timeout_time(delay);
+        }
+        self
+    }
+
+    ///todo 重构时间轮
+    pub fn delay_with(&mut self, delay: Duration, param: Option<*mut c_void>) -> &mut Self {
+        self.delay(delay);
+        //覆盖用户参数
+        self.set_param(param);
+        self
+    }
+
+    pub fn exit(&mut self) {
+        self.status = Status::Exited;
+        self.stack.drop();
+    }
+
+    ///下方开始get/set
     pub fn set_param(&mut self, param: Option<*mut c_void>) -> &mut Self {
         unsafe {
             let context = self.sp.data as *mut Coroutine<F>;
@@ -147,9 +178,9 @@ impl<F> Coroutine<F> {
         unsafe { (*context).status }
     }
 
-    pub fn exit(&mut self) {
-        self.status = Status::Exited;
-        self.stack.drop();
+    pub fn get_execute_time(&self) -> u64 {
+        let context = self.sp.data as *mut Coroutine<F>;
+        unsafe { (*context).exec_time }
     }
 }
 
