@@ -27,6 +27,7 @@ pub enum Status {
 
 #[derive(Debug)]
 pub struct Coroutine<F> {
+    //todo 增加id字段
     stack: &'static Stack,
     sp: Transfer,
     status: Status,

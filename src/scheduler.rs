@@ -37,7 +37,8 @@ impl<F> Scheduler<F>
         self.ready.push_back(coroutine);
     }
 
-    pub fn schedule(&mut self) {
+    pub fn schedule(&mut self) -> VecDeque<Coroutine<F>>{
+        let mut queue =VecDeque::new();
         unsafe {
             for _ in 0..self.suspend.len() {
                 match self.suspend.front() {
@@ -64,22 +65,29 @@ impl<F> Scheduler<F>
             }
             for _ in 0..self.ready.len() {
                 match self.ready.pop_front() {
-                    Some(coroutine) => {
+                    Some(mut coroutine) => {
                         let exec_time = coroutine.get_execute_time();
                         if timer::now() < exec_time {
                             //移动至"挂起"队列
-                            self.suspend.insert(exec_time,coroutine);
+                            self.suspend.insert(exec_time, coroutine);
                             continue;
                         }
                         self.running = Some(ptr::read(&coroutine));
-                        coroutine.resume();
+                        let result = coroutine.resume();
+                        coroutine.set_result(result.get_result());
                         //移动至"已完成"队列
+                        queue.push_back(ptr::read(&coroutine));
                         self.finished.push_back(coroutine);
                     }
                     None => {}
                 }
             }
+            queue
         }
+    }
+
+    pub fn get_finished(&self) -> &VecDeque<Coroutine<F>> {
+        &self.finished
     }
 }
 
@@ -122,11 +130,25 @@ mod tests {
         assert_eq!(1, entry.len());
 
         scheduler.offer(Coroutine::new(&STACK2, closure, Some(2usize as *mut c_void)));
-        scheduler.schedule();
+        for co in scheduler.schedule() {
+            match co.get_result() {
+                Some(data) => {
+                    println!("{}", data as usize)
+                }
+                None => {}
+            }
+        }
 
         //往下睡500+ms，才会轮询到
         thread::sleep(Duration::from_millis(501));
-        scheduler.schedule();
+        for co in scheduler.schedule() {
+            match co.get_result() {
+                Some(data) => {
+                    println!("{}", data as usize)
+                }
+                None => {}
+            }
+        }
         assert_eq!(0, scheduler.ready.len());
         assert_eq!(0, scheduler.suspend.len());
     }

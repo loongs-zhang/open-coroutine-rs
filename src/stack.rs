@@ -152,7 +152,6 @@ impl Stack {
     }
 
     pub(crate) fn drop(&self) {
-        //todo 不是真的drop，而是归还给内存池
         unsafe {
             let mut ptr = self.bottom();
             let mut size = self.len();
@@ -163,6 +162,10 @@ impl Stack {
             }
             sys::deallocate_stack(ptr, size);
         }
+    }
+
+    pub(crate) fn revert(&self) {
+        //todo 不是真的drop，而是归还给内存池
     }
 }
 
