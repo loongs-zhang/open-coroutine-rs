@@ -1,21 +1,21 @@
 use std::borrow::Borrow;
-use std::collections::{BTreeMap, LinkedList};
+use std::collections::{BTreeMap, VecDeque};
 use std::hash::Hash;
 use std::os::raw::c_void;
 use std::ptr;
 use crate::coroutine::{Coroutine, Status};
 use crate::timer;
+use crate::timer::{TimerEntry, TimerList};
 
 pub struct Scheduler<F> {
-    ready: LinkedList<Coroutine<F>>,
+    ready: VecDeque<Coroutine<F>>,
     running: Option<Coroutine<F>>,
-    //todo 重构时间轮，只要list就可以了
-    suspend: BTreeMap<u64, LinkedList<Coroutine<F>>>,
+    suspend: TimerList<Coroutine<F>>,
     //not support for now
-    system_call: LinkedList<Coroutine<F>>,
+    system_call: VecDeque<Coroutine<F>>,
     //not support for now
-    copy_stack: LinkedList<Coroutine<F>>,
-    finished: LinkedList<Coroutine<F>>,
+    copy_stack: VecDeque<Coroutine<F>>,
+    finished: VecDeque<Coroutine<F>>,
 }
 
 impl<F> Scheduler<F>
@@ -23,12 +23,12 @@ impl<F> Scheduler<F>
 {
     pub fn new() -> Self {
         Scheduler {
-            ready: LinkedList::new(),
+            ready: VecDeque::new(),
             running: None,
-            suspend: BTreeMap::new(),
-            system_call: LinkedList::new(),
-            copy_stack: LinkedList::new(),
-            finished: LinkedList::new(),
+            suspend: TimerList::new(),
+            system_call: VecDeque::new(),
+            copy_stack: VecDeque::new(),
+            finished: VecDeque::new(),
         }
     }
 
@@ -39,18 +39,28 @@ impl<F> Scheduler<F>
 
     pub fn schedule(&mut self) {
         unsafe {
-            for (exec_time, list) in self.suspend.iter_mut() {
-                if timer::now() < *exec_time {
-                    break;
-                }
-                //移动至"就绪"队列
-                for _ in 0..list.len() {
-                    match list.pop_front() {
-                        Some(coroutine) => self.ready.push_front(coroutine),
-                        None => {}
+            for _ in 0..self.suspend.len() {
+                match self.suspend.front() {
+                    Some(entry) => {
+                        let exec_time = entry.get_time();
+                        if timer::now() < exec_time {
+                            break;
+                        }
+                        //移动至"就绪"队列
+                        match self.suspend.pop_front() {
+                            Some(mut entry) => {
+                                for _ in 0..entry.len() {
+                                    match entry.pop_front() {
+                                        Some(coroutine) => self.ready.push_back(coroutine),
+                                        None => {}
+                                    }
+                                }
+                            }
+                            None => {}
+                        }
                     }
+                    None => {}
                 }
-                //todo 清理空list的entry
             }
             for _ in 0..self.ready.len() {
                 match self.ready.pop_front() {
@@ -58,9 +68,7 @@ impl<F> Scheduler<F>
                         let exec_time = coroutine.get_execute_time();
                         if timer::now() < exec_time {
                             //移动至"挂起"队列
-                            self.suspend.entry(exec_time)
-                                .or_insert(LinkedList::new())
-                                .push_back(coroutine);
+                            self.suspend.insert(exec_time,coroutine);
                             continue;
                         }
                         self.running = Some(ptr::read(&coroutine));
@@ -110,8 +118,8 @@ mod tests {
         scheduler.schedule();
         assert_eq!(0, scheduler.ready.len());
         assert_eq!(1, scheduler.suspend.len());
-        let (time, list) = scheduler.suspend.iter().next().unwrap();
-        assert_eq!(1, list.len());
+        let entry = scheduler.suspend.front().unwrap();
+        assert_eq!(1, entry.len());
 
         scheduler.offer(Coroutine::new(&STACK2, closure, Some(2usize as *mut c_void)));
         scheduler.schedule();
@@ -120,8 +128,6 @@ mod tests {
         thread::sleep(Duration::from_millis(1000));
         scheduler.schedule();
         assert_eq!(0, scheduler.ready.len());
-        assert_eq!(1, scheduler.suspend.len());
-        let (time, list) = scheduler.suspend.iter().next().unwrap();
-        assert_eq!(0, list.len());
+        assert_eq!(0, scheduler.suspend.len());
     }
 }
