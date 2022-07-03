@@ -124,8 +124,8 @@ mod tests {
         scheduler.offer(Coroutine::new(&STACK2, closure, Some(2usize as *mut c_void)));
         scheduler.schedule();
 
-        //往下睡1s，才会轮询到
-        thread::sleep(Duration::from_millis(1000));
+        //往下睡500+ms，才会轮询到
+        thread::sleep(Duration::from_millis(501));
         scheduler.schedule();
         assert_eq!(0, scheduler.ready.len());
         assert_eq!(0, scheduler.suspend.len());
