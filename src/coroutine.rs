@@ -39,6 +39,10 @@ pub struct Coroutine<F> {
     result: Option<*mut c_void>,
     //下一次应该执行协程体的时间
     exec_time: u64,
+    //下一个执行的协程
+    next: Option<*mut Coroutine<F>>,
+    //入口协程，也是出口
+    entrance: Option<*mut Coroutine<F>>,
 }
 
 impl<F> Coroutine<F>
@@ -60,25 +64,27 @@ impl<F> Coroutine<F>
                     Some(data) => { print!("coroutine_function {} => ", data as usize) }
                     None => { print!("coroutine_function no param => ") }
                 }
+                //调用用户函数
                 let mut func = ptr::read((*context).proc.as_ref());
+                let result = func(param);
+                //返回新的上下文
+                func = ptr::read((*context).proc.as_ref());
                 let mut new_context = Coroutine::init(
                     //设置协程状态为已完成，resume的时候，已经调用完了用户函数
-                    (*context).stack, Status::Finished, Box::new(func), param);
-                //调用用户函数
-                func = ptr::read((*context).proc.as_ref());
-                new_context.set_result(func(param));
+                    (*context).stack, Status::Finished, Box::new(func), param, None);
+                new_context.set_result(result);
                 //todo 不回跳，继续执行下一个ready的协程
                 t = t.resume(&mut new_context as *mut Coroutine<F> as *mut c_void);
             }
         }
     }
 
-    pub fn new(stack: &'static Stack, proc: F, param: Option<*mut c_void>) -> Self {
-        Coroutine::init(stack, Status::Created, Box::new(proc), param)
+    pub fn new(stack: &'static Stack, proc: F, param: Option<*mut c_void>, next: Option<*mut Coroutine<F>>) -> Self {
+        Coroutine::init(stack, Status::Created, Box::new(proc), param, next)
         //todo 加到ready队列中，status再置为ready
     }
 
-    fn init(stack: &'static Stack, status: Status, proc: Box<F>, param: Option<*mut c_void>) -> Self {
+    fn init(stack: &'static Stack, status: Status, proc: Box<F>, param: Option<*mut c_void>, next: Option<*mut Coroutine<F>>) -> Self {
         let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
         // Allocate a Context on the stack.
         let mut sp = Transfer::new(inner, 0 as *mut c_void);
@@ -91,6 +97,8 @@ impl<F> Coroutine<F>
             result: None,
             //默认轮询到了立刻执行
             exec_time: 0,
+            next,
+            entrance: None,
         };
         context.sp.data = &mut context as *mut Coroutine<F> as *mut c_void;
         context
@@ -217,7 +225,7 @@ mod tests {
                 }
             }
             param
-        }, None);
+        }, None, None);
         for i in 0..10 {
             print!("Resuming {} => ", i);
             c = c.delay_with(Duration::from_millis(100), Some(i as *mut c_void));

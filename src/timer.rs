@@ -24,6 +24,7 @@ pub(crate) fn get_timeout_time(dur: Duration) -> u64 {
     return now() + interval;
 }
 
+#[derive(Debug)]
 pub struct TimerEntry<T> {
     time: u64,
     dequeue: VecDeque<T>,
@@ -51,6 +52,7 @@ impl<T> TimerEntry<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct TimerList<T> {
     dequeue: VecDeque<TimerEntry<T>>,
 }
