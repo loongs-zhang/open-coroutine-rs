@@ -79,8 +79,8 @@ impl<F> Coroutine<F>
         }
     }
 
-    pub fn new(stack: &'static Stack, proc: F, param: Option<*mut c_void>, next: Option<*mut Coroutine<F>>) -> Self {
-        Coroutine::init(stack, Status::Created, Box::new(proc), param, next)
+    pub fn new(stack: &'static Stack, proc: F, param: Option<*mut c_void>) -> Self {
+        Coroutine::init(stack, Status::Created, Box::new(proc), param, None)
         //todo 加到ready队列中，status再置为ready
     }
 
@@ -225,7 +225,7 @@ mod tests {
                 }
             }
             param
-        }, None, None);
+        }, None);
         for i in 0..10 {
             print!("Resuming {} => ", i);
             c = c.delay_with(Duration::from_millis(100), Some(i as *mut c_void));
