@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 libc = "0.2.119"
 lazy_static = "1.4.0"
+crossbeam-deque = "0.8.1"
 
 [target."cfg(windows)".dependencies.kernel32-sys]
 version = "0.2.2"

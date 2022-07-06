@@ -53,7 +53,7 @@ impl Error for StackError {
 ///
 /// `FixedSizeStack` as well as `ProtectedFixedSizeStack`
 /// can be used to allocate actual stack space.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Stack {
     top: *mut c_void,
     bottom: *mut c_void,
@@ -151,21 +151,15 @@ impl Stack {
         Err(StackError::ExceedsMaximumSize(max_stack_size - add))
     }
 
-    pub(crate) fn drop(&self) {
-        unsafe {
-            let mut ptr = self.bottom();
-            let mut size = self.len();
-            if self.protected {
-                let page_size = sys::page_size();
-                ptr = (self.bottom() as usize - page_size) as *mut c_void;
-                size = self.len() + page_size;
-            }
-            sys::deallocate_stack(ptr, size);
+    pub fn drop(&self) {
+        let mut ptr = self.bottom();
+        let mut size = self.len();
+        if self.protected {
+            let page_size = sys::page_size();
+            ptr = (self.bottom() as usize - page_size) as *mut c_void;
+            size = self.len() + page_size;
         }
-    }
-
-    pub(crate) fn revert(&self) {
-        //todo 不是真的drop，而是归还给内存池
+        unsafe { sys::deallocate_stack(ptr, size); }
     }
 }
 
@@ -177,7 +171,7 @@ unsafe impl Send for Stack {}
 /// only be mapped to physical memory if they are used.
 ///
 /// _As a general rule it is recommended to use `ProtectedFixedSizeStack` instead._
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct FixedSizeStack(Stack);
 
 impl FixedSizeStack {
@@ -218,7 +212,7 @@ impl Default for FixedSizeStack {
 /// cause a segmentation fault instead letting the memory being overwritten silently.
 ///
 /// _As a general rule it is recommended to use **this** struct to create stack memory._
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct ProtectedFixedSizeStack(Stack);
 
 impl ProtectedFixedSizeStack {
