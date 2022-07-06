@@ -94,8 +94,6 @@ impl<T> TimerList<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::coroutine::Coroutine;
-    use crate::stack::ProtectedFixedSizeStack;
     use crate::timer;
     use crate::timer::TimerList;
 
@@ -104,26 +102,11 @@ mod tests {
         println!("{}", timer::now());
     }
 
-    lazy_static! {
-        static ref STACK: ProtectedFixedSizeStack = ProtectedFixedSizeStack::new(2048).expect("allocate stack failed !");
-    }
-
     #[test]
     fn timer_list() {
         let mut list = TimerList::new();
         assert_eq!(list.len(), 0);
-        let coroutine = Coroutine::new(&STACK, |param| {
-            match param {
-                Some(param) => {
-                    print!("user_function {} => ", param as usize);
-                }
-                None => {
-                    print!("user_function no param => ");
-                }
-            }
-            param
-        }, None);
-        list.insert(1, coroutine);
+        list.insert(1, String::from("data can be everything"));
         assert_eq!(list.len(), 1);
 
         let mut entry = list.pop_front().unwrap();
