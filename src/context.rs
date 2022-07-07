@@ -1,6 +1,7 @@
 use core::fmt;
 use std::fmt::{Debug, Formatter};
 use std::os::raw::c_void;
+use std::ptr::NonNull;
 use crate::stack::Stack;
 
 /// A `Context` stores a `ContextFn`'s state of execution, for it to be resumed later.
@@ -35,8 +36,9 @@ impl Context {
     /// It is unsafe because it only takes a reference of `Stack`. You have to make sure the
     /// `Stack` lives longer than the generated `Context`.
     #[inline(always)]
-    pub(crate) fn new(stack: &Stack, f: ContextFn) -> Context {
-        Context(unsafe { make_fcontext(stack.top(), stack.len(), f) })
+    pub(crate) fn new(stack: NonNull<Stack>, f: ContextFn) -> Context {
+        let ptr = stack.as_ptr();
+        Context(unsafe { make_fcontext((*ptr).top(), (*ptr).len(), f) })
     }
 
     /// Yields the execution to another `Context`.
@@ -124,8 +126,9 @@ extern "C" {
 #[cfg(test)]
 mod tests {
     use std::os::raw::c_void;
+    use std::ptr::NonNull;
     use crate::context::{Context, Transfer};
-    use crate::stack::ProtectedFixedSizeStack;
+    use crate::stack::{ProtectedFixedSizeStack, Stack};
 
     // This method will always `resume()` immediately back to the
     // previous `Context` with a `data` value of the next number in the fibonacci sequence.
@@ -149,9 +152,9 @@ mod tests {
     fn test() {
         println!("inner context test started !");
         // Allocate some stack.
-        let stack = ProtectedFixedSizeStack::default();
+        let mut stack = *ProtectedFixedSizeStack::default();
 
-        let context = Context::new(&stack, context_function);
+        let context = Context::new(NonNull::new(&mut stack).expect("ptr is null"), context_function);
         // Allocate a Context on the stack.
         let mut t = Transfer::new(context, 0 as *mut c_void);
 

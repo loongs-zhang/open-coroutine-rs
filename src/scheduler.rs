@@ -98,7 +98,7 @@ mod tests {
     use std::time::Duration;
     use crate::coroutine::{Coroutine, Status};
     use crate::scheduler::Scheduler;
-    use crate::stack::ProtectedFixedSizeStack;
+    use crate::stack::{ProtectedFixedSizeStack, Stack};
 
     lazy_static! {
         static ref STACK1: ProtectedFixedSizeStack = ProtectedFixedSizeStack::new(2048).expect("allocate stack failed !");
@@ -119,7 +119,8 @@ mod tests {
             }
             param
         };
-        let mut coroutine = Coroutine::new(&STACK1, closure, Some(1usize as *mut c_void));
+        let mut stack1 =ProtectedFixedSizeStack::new(2048).expect("allocate stack failed !");
+        let mut coroutine = Coroutine::new(&mut stack1 as *mut _ as *mut Stack, closure, Some(1usize as *mut c_void));
         coroutine.set_delay(Duration::from_millis(500))
             .set_status(Status::Suspend);
         scheduler.offer(coroutine);
@@ -129,7 +130,8 @@ mod tests {
         let entry = scheduler.suspend.front().unwrap();
         assert_eq!(1, entry.len());
 
-        scheduler.offer(Coroutine::new(&STACK2, closure, Some(2usize as *mut c_void)));
+        let mut stack2 =ProtectedFixedSizeStack::new(2048).expect("allocate stack failed !");
+        scheduler.offer(Coroutine::new(&mut stack2 as *mut _ as *mut Stack, closure, Some(2usize as *mut c_void)));
         for co in scheduler.schedule() {
             match co.get_result() {
                 Some(data) => {

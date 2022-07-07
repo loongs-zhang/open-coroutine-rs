@@ -1,5 +1,6 @@
 use std::os::raw::c_void;
 use std::{ptr, thread};
+use std::ptr::NonNull;
 use std::time::Duration;
 use crate::context::{Context, Transfer};
 use crate::stack::{ProtectedFixedSizeStack, Stack};
@@ -28,7 +29,7 @@ pub enum Status {
 #[derive(Debug)]
 pub struct Coroutine<F> {
     //todo 增加id字段
-    stack: &'static Stack,
+    stack: NonNull<Stack>,
     sp: Transfer,
     status: Status,
     //用户函数
@@ -79,12 +80,15 @@ impl<F> Coroutine<F>
         }
     }
 
-    pub fn new(stack: &'static Stack, proc: F, param: Option<*mut c_void>) -> Self {
+    pub fn new(stack: *mut Stack, proc: F, param: Option<*mut c_void>) -> Self {
+        let stack = NonNull::new(stack).expect("ptr can not be null !");
         Coroutine::init(stack, Status::Created, Box::new(proc), param, None)
         //todo 加到ready队列中，status再置为ready
     }
 
-    fn init(stack: &'static Stack, status: Status, proc: Box<F>, param: Option<*mut c_void>, next: Option<*mut Coroutine<F>>) -> Self {
+    fn init(stack: NonNull<Stack>, status: Status,
+            proc: Box<F>, param: Option<*mut c_void>,
+            next: Option<*mut Coroutine<F>>) -> Self {
         let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
         // Allocate a Context on the stack.
         let mut sp = Transfer::new(inner, 0 as *mut c_void);
@@ -143,7 +147,7 @@ impl<F> Coroutine<F> {
 
     pub fn exit(&mut self) {
         self.set_status(Status::Exited);
-        self.stack.drop();
+        // self.stack.drop();
     }
 
     ///下方开始get/set
@@ -206,16 +210,13 @@ mod tests {
     use std::os::raw::c_void;
     use std::time::Duration;
     use crate::coroutine::Coroutine;
-    use crate::stack::ProtectedFixedSizeStack;
-
-    lazy_static! {
-        static ref STACK: ProtectedFixedSizeStack = ProtectedFixedSizeStack::new(2048).expect("allocate stack failed !");
-    }
+    use crate::stack::{ProtectedFixedSizeStack, Stack};
 
     #[test]
     fn test() {
         println!("context test started !");
-        let mut c = Coroutine::new(&STACK, |param| {
+        let mut stack = ProtectedFixedSizeStack::new(2048).expect("allocate stack failed !");
+        let mut c = Coroutine::new(&mut stack as *mut _ as *mut Stack, |param| {
             match param {
                 Some(param) => {
                     print!("user_function {} => ", param as usize);
