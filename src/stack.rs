@@ -53,7 +53,7 @@ impl Error for StackError {
 ///
 /// `FixedSizeStack` as well as `ProtectedFixedSizeStack`
 /// can be used to allocate actual stack space.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct Stack {
     top: *mut c_void,
     bottom: *mut c_void,
@@ -90,6 +90,11 @@ impl Stack {
     #[inline]
     pub fn bottom(&self) -> *mut c_void {
         self.bottom
+    }
+
+    #[inline]
+    pub fn protected(&self) -> bool {
+        self.protected
     }
 
     /// Returns the size of the stack between top() and bottom().
@@ -171,7 +176,7 @@ unsafe impl Send for Stack {}
 /// only be mapped to physical memory if they are used.
 ///
 /// _As a general rule it is recommended to use `ProtectedFixedSizeStack` instead._
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct FixedSizeStack(Stack);
 
 impl FixedSizeStack {
@@ -212,7 +217,7 @@ impl Default for FixedSizeStack {
 /// cause a segmentation fault instead letting the memory being overwritten silently.
 ///
 /// _As a general rule it is recommended to use **this** struct to create stack memory._
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct ProtectedFixedSizeStack(Stack);
 
 impl ProtectedFixedSizeStack {
@@ -281,5 +286,18 @@ mod tests {
             Err(StackError::ExceedsMaximumSize(..)) => {}
             _ => panic!(),
         }
+    }
+
+    #[test]
+    fn clone() {
+        let size = sys::min_stack_size();
+        let stack = ProtectedFixedSizeStack::new(size).unwrap();
+        assert_eq!(stack.len(), size);
+        let clone = stack.clone();
+        assert_eq!(stack.len(), clone.len());
+        assert_eq!(stack.protected(), clone.protected());
+        assert_eq!(stack.top(), clone.top());
+        assert_eq!(stack.bottom(), clone.bottom());
+        assert_eq!(stack, clone);
     }
 }
