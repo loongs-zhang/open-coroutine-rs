@@ -78,25 +78,46 @@ impl SizedMemoryPool {
     }
 }
 
+impl Default for SizedMemoryPool {
+    fn default() -> Self {
+        SizedMemoryPool::new(Stack::default_size())
+    }
+}
+
 lazy_static! {
     static ref MEMORY_POOL: RwLock<HashMap<usize, SizedMemoryPool>> = RwLock::new(HashMap::new());
 }
 
-pub fn get_memory_pool(size: usize) -> SizedMemoryPool {
+pub fn available(size: usize) -> usize {
     match MEMORY_POOL.write() {
         Ok(mut map) => {
             match map.get_mut(&size) {
                 Some(pool) => {
-                    unsafe { ptr::read(pool) }
+                    pool.available().len()
                 }
-                None => {
-                    map.insert(size, SizedMemoryPool::new(size));
-                    unsafe { ptr::read(map.get_mut(&size).unwrap()) }
-                }
+                None => 0
             }
         }
-        Err(_) => get_memory_pool(size)
+        Err(_) => available(size)
     }
+}
+
+pub fn using(size: usize) -> usize {
+    match MEMORY_POOL.write() {
+        Ok(mut map) => {
+            match map.get_mut(&size) {
+                Some(pool) => {
+                    pool.using().len()
+                }
+                None => 0
+            }
+        }
+        Err(_) => using(size)
+    }
+}
+
+pub fn default() -> Result<ProtectedFixedSizeStack, StackError> {
+    allocate(Stack::default_size())
 }
 
 pub fn allocate(size: usize) -> Result<ProtectedFixedSizeStack, StackError> {
@@ -169,12 +190,10 @@ mod tests {
         let stack = pools::allocate(size).unwrap();
         assert_eq!(size, stack.len());
         assert_eq!(1, MEMORY_POOL.read().unwrap().len());
-        let pool = pools::get_memory_pool(size);
-        assert_eq!(0, pool.available().len());
-        assert_eq!(1, pool.using().len());
+        assert_eq!(0, pools::available(size));
+        assert_eq!(1, pools::using(size));
         pools::revert(stack);
-        assert_eq!(1, pool.available().len());
-        // fixme
-        // assert_eq!(0, pool.using().len());
+        assert_eq!(1, pools::available(size));
+        assert_eq!(0, pools::using(size));
     }
 }
