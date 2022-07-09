@@ -100,11 +100,6 @@ mod tests {
     use crate::coroutine::{Coroutine, Status};
     use crate::scheduler::Scheduler;
 
-    lazy_static! {
-        static ref STACK1: Memory = Memory::new(2048).expect("allocate stack failed !");
-        static ref STACK2: Memory = Memory::new(2048).expect("allocate stack failed !");
-    }
-
     #[test]
     fn test() {
         let mut scheduler = Scheduler::new();

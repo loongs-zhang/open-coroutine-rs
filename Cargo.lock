@@ -108,7 +108,6 @@ name = "open-coroutine"
 version = "0.1.0"
 dependencies = [
  "cc",
- "lazy_static",
  "memory-pool",
  "rustversion",
 ]
