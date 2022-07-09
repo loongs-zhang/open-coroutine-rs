@@ -37,8 +37,8 @@ impl<F> Scheduler<F>
         self.ready.push_back(coroutine);
     }
 
-    pub fn schedule(&mut self) -> VecDeque<Coroutine<F>>{
-        let mut queue =VecDeque::new();
+    pub fn schedule(&mut self) -> VecDeque<Coroutine<F>> {
+        let mut queue = VecDeque::new();
         unsafe {
             for _ in 0..self.suspend.len() {
                 match self.suspend.front() {
@@ -96,13 +96,13 @@ mod tests {
     use std::{mem, thread};
     use std::os::raw::c_void;
     use std::time::Duration;
+    use memory_pool::memory::Memory;
     use crate::coroutine::{Coroutine, Status};
     use crate::scheduler::Scheduler;
-    use crate::stack::{ProtectedFixedSizeStack, Stack};
 
     lazy_static! {
-        static ref STACK1: ProtectedFixedSizeStack = ProtectedFixedSizeStack::new(2048).expect("allocate stack failed !");
-        static ref STACK2: ProtectedFixedSizeStack = ProtectedFixedSizeStack::new(2048).expect("allocate stack failed !");
+        static ref STACK1: Memory = Memory::new(2048).expect("allocate stack failed !");
+        static ref STACK2: Memory = Memory::new(2048).expect("allocate stack failed !");
     }
 
     #[test]
@@ -119,8 +119,8 @@ mod tests {
             }
             param
         };
-        let mut stack1 =ProtectedFixedSizeStack::new(2048).expect("allocate stack failed !");
-        let mut coroutine = Coroutine::new(&mut stack1 as *mut _ as *mut Stack, closure, Some(1usize as *mut c_void));
+        let mut stack1 = Memory::new(2048).expect("allocate stack failed !");
+        let mut coroutine = Coroutine::new(&mut stack1 as *mut _ as *mut Memory, closure, Some(1usize as *mut c_void));
         coroutine.set_delay(Duration::from_millis(500))
             .set_status(Status::Suspend);
         scheduler.offer(coroutine);
@@ -130,8 +130,8 @@ mod tests {
         let entry = scheduler.suspend.front().unwrap();
         assert_eq!(1, entry.len());
 
-        let mut stack2 =ProtectedFixedSizeStack::new(2048).expect("allocate stack failed !");
-        scheduler.offer(Coroutine::new(&mut stack2 as *mut _ as *mut Stack, closure, Some(2usize as *mut c_void)));
+        let mut stack2 = Memory::new(2048).expect("allocate stack failed !");
+        scheduler.offer(Coroutine::new(&mut stack2 as *mut _ as *mut Memory, closure, Some(2usize as *mut c_void)));
         for co in scheduler.schedule() {
             match co.get_result() {
                 Some(data) => {

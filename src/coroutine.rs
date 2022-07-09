@@ -2,8 +2,8 @@ use std::os::raw::c_void;
 use std::{ptr, thread};
 use std::ptr::NonNull;
 use std::time::Duration;
+use memory_pool::memory::Memory;
 use crate::context::{Context, Transfer};
-use crate::stack::{ProtectedFixedSizeStack, Stack};
 use crate::timer;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -29,7 +29,7 @@ pub enum Status {
 #[derive(Debug)]
 pub struct Coroutine<F> {
     //todo 增加id字段
-    stack: NonNull<Stack>,
+    stack: NonNull<Memory>,
     sp: Transfer,
     status: Status,
     //用户函数
@@ -80,13 +80,13 @@ impl<F> Coroutine<F>
         }
     }
 
-    pub fn new(stack: *mut Stack, proc: F, param: Option<*mut c_void>) -> Self {
+    pub fn new(stack: *mut Memory, proc: F, param: Option<*mut c_void>) -> Self {
         let stack = NonNull::new(stack).expect("ptr can not be null !");
         Coroutine::init(stack, Status::Created, Box::new(proc), param, None)
         //todo 加到ready队列中，status再置为ready
     }
 
-    fn init(stack: NonNull<Stack>, status: Status,
+    fn init(stack: NonNull<Memory>, status: Status,
             proc: Box<F>, param: Option<*mut c_void>,
             next: Option<*mut Coroutine<F>>) -> Self {
         let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
@@ -209,14 +209,14 @@ impl<F> Coroutine<F> {
 mod tests {
     use std::os::raw::c_void;
     use std::time::Duration;
+    use memory_pool::memory::Memory;
     use crate::coroutine::Coroutine;
-    use crate::stack::{ProtectedFixedSizeStack, Stack};
 
     #[test]
     fn test() {
         println!("context test started !");
-        let mut stack = ProtectedFixedSizeStack::new(2048).expect("allocate stack failed !");
-        let mut c = Coroutine::new(&mut stack as *mut _ as *mut Stack, |param| {
+        let mut stack = Memory::new(2048).expect("allocate stack failed !");
+        let mut c = Coroutine::new(&mut stack as *mut _ as *mut Memory, |param| {
             match param {
                 Some(param) => {
                     print!("user_function {} => ", param as usize);

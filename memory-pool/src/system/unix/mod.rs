@@ -13,7 +13,7 @@ use std::usize;
 
 use libc;
 
-use crate::stack::Stack;
+use crate::memory::Memory;
 
 #[cfg(any(target_os = "openbsd", target_os = "macos", target_os = "ios", target_os = "android"))]
 const MAP_STACK: libc::c_int = 0;
@@ -21,7 +21,7 @@ const MAP_STACK: libc::c_int = 0;
 #[cfg(not(any(target_os = "openbsd", target_os = "macos", target_os = "ios", target_os = "android")))]
 const MAP_STACK: libc::c_int = libc::MAP_STACK;
 
-pub unsafe fn allocate_stack(size: usize) -> io::Result<Stack> {
+pub unsafe fn allocate(size: usize) -> io::Result<Memory> {
     const NULL: *mut libc::c_void = 0 as *mut libc::c_void;
     const PROT: libc::c_int = libc::PROT_READ | libc::PROT_WRITE;
     const TYPE: libc::c_int = libc::MAP_PRIVATE | libc::MAP_ANON | MAP_STACK;
@@ -31,11 +31,11 @@ pub unsafe fn allocate_stack(size: usize) -> io::Result<Stack> {
     if ptr == libc::MAP_FAILED {
         Err(io::Error::last_os_error())
     } else {
-        Ok(Stack::new((ptr as usize + size) as *mut c_void, ptr as *mut c_void, false))
+        Ok(Memory::init((ptr as usize + size) as *mut c_void, ptr as *mut c_void, false))
     }
 }
 
-pub unsafe fn protect_stack(stack: &Stack) -> io::Result<Stack> {
+pub unsafe fn protect(stack: &Memory) -> io::Result<Memory> {
     let page_size = page_size();
 
     debug_assert!(stack.len() % page_size == 0 && stack.len() != 0);
@@ -49,11 +49,11 @@ pub unsafe fn protect_stack(stack: &Stack) -> io::Result<Stack> {
         Err(io::Error::last_os_error())
     } else {
         let bottom = (stack.bottom() as usize + page_size) as *mut c_void;
-        Ok(Stack::new(stack.top(), bottom, true))
+        Ok(Memory::init(stack.top(), bottom, true))
     }
 }
 
-pub unsafe fn deallocate_stack(ptr: *mut c_void, size: usize) {
+pub unsafe fn deallocate(ptr: *mut c_void, size: usize) {
     libc::munmap(ptr as *mut libc::c_void, size);
 }
 
@@ -73,13 +73,13 @@ pub fn page_size() -> usize {
     ret
 }
 
-pub fn min_stack_size() -> usize {
+pub fn min_size() -> usize {
     // Previously libc::SIGSTKSZ has been used for this, but it proofed to be very unreliable,
     // because the resulting values varied greatly between platforms.
     page_size()
 }
 
-pub fn max_stack_size() -> usize {
+pub fn max_size(protected: bool) -> usize {
     static PAGE_SIZE: AtomicUsize = AtomicUsize::new(0);
 
     let mut ret = PAGE_SIZE.load(Ordering::Relaxed);
@@ -104,5 +104,9 @@ pub fn max_stack_size() -> usize {
         }
     }
 
-    ret
+    if protected {
+        ret - page_size()
+    } else {
+        ret
+    }
 }

@@ -15,9 +15,9 @@ use kernel32;
 use winapi;
 
 use stack::Stack;
-use crate::stack::Stack;
+use crate::memory::Memory;
 
-pub unsafe fn allocate_stack(size: usize) -> io::Result<Stack> {
+pub unsafe fn allocate(size: usize) -> io::Result<Memory> {
     const NULL: winapi::LPVOID = 0 as winapi::LPVOID;
     const PROT: winapi::DWORD = winapi::PAGE_READWRITE;
     const TYPE: winapi::DWORD = winapi::MEM_COMMIT | winapi::MEM_RESERVE;
@@ -27,11 +27,11 @@ pub unsafe fn allocate_stack(size: usize) -> io::Result<Stack> {
     if ptr == NULL {
         Err(io::Error::last_os_error())
     } else {
-        Ok(Stack::new((ptr as usize + size) as *mut c_void, ptr as *mut c_void, false))
+        Ok(Memory::init((ptr as usize + size) as *mut c_void, ptr as *mut c_void, false))
     }
 }
 
-pub unsafe fn protect_stack(stack: &Stack) -> io::Result<Stack> {
+pub unsafe fn protect(stack: &Memory) -> io::Result<Memory> {
     const TYPE: winapi::DWORD = winapi::PAGE_READWRITE | winapi::PAGE_GUARD;
 
     let page_size = page_size();
@@ -48,11 +48,11 @@ pub unsafe fn protect_stack(stack: &Stack) -> io::Result<Stack> {
         Err(io::Error::last_os_error())
     } else {
         let bottom = (stack.bottom() as usize + page_size) as *mut c_void;
-        Ok(Stack::new(stack.top(), bottom, true))
+        Ok(Memory::init(stack.top(), bottom, true))
     }
 }
 
-pub unsafe fn deallocate_stack(ptr: *mut c_void, _: usize) {
+pub unsafe fn deallocate(ptr: *mut c_void, _: usize) {
     kernel32::VirtualFree(ptr as winapi::LPVOID, 0, winapi::MEM_RELEASE);
 }
 
@@ -75,11 +75,11 @@ pub fn page_size() -> usize {
 }
 
 // Windows does not seem to provide a stack limit API
-pub fn min_stack_size() -> usize {
+pub fn min_size() -> usize {
     page_size()
 }
 
 // Windows does not seem to provide a stack limit API
-pub fn max_stack_size() -> usize {
+pub fn max_size(protected: bool) -> usize {
     usize::MAX
 }

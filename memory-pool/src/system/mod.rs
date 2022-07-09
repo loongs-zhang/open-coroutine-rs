@@ -12,12 +12,12 @@ mod unix;
 
 #[cfg(unix)]
 pub use self::unix::{
-    allocate_stack,
-    deallocate_stack,
-    max_stack_size,
-    min_stack_size,
+    allocate,
+    deallocate,
+    max_size,
+    min_size,
     page_size,
-    protect_stack,
+    protect,
 };
 
 #[cfg(windows)]
@@ -25,17 +25,17 @@ mod windows;
 
 #[cfg(windows)]
 pub use self::windows::{
-    allocate_stack,
-    deallocate_stack,
-    max_stack_size,
-    min_stack_size,
+    allocate,
+    deallocate,
+    max_size,
+    min_size,
     page_size,
-    protect_stack,
+    protect,
 };
 
-pub fn default_stack_size() -> usize {
-    let size = self::min_stack_size() * 8;
-    let max_stack_size = self::max_stack_size();
+pub fn default_size(protected: bool) -> usize {
+    let size = self::min_size() * 8;
+    let max_stack_size = self::max_size(protected);
 
     cmp::min(size, max_stack_size)
 }
