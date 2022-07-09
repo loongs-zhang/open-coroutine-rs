@@ -114,8 +114,7 @@ mod tests {
             }
             param
         };
-        let mut stack1 = Memory::new(2048).expect("allocate stack failed !");
-        let mut coroutine = Coroutine::new(&mut stack1 as *mut _ as *mut Memory, closure, Some(1usize as *mut c_void));
+        let mut coroutine = Coroutine::new(2048, closure, Some(1usize as *mut c_void));
         coroutine.set_delay(Duration::from_millis(500))
             .set_status(Status::Suspend);
         scheduler.offer(coroutine);
@@ -125,8 +124,7 @@ mod tests {
         let entry = scheduler.suspend.front().unwrap();
         assert_eq!(1, entry.len());
 
-        let mut stack2 = Memory::new(2048).expect("allocate stack failed !");
-        scheduler.offer(Coroutine::new(&mut stack2 as *mut _ as *mut Memory, closure, Some(2usize as *mut c_void)));
+        scheduler.offer(Coroutine::new(2048, closure, Some(2usize as *mut c_void)));
         for co in scheduler.schedule() {
             match co.get_result() {
                 Some(data) => {

@@ -1,5 +1,6 @@
 use core::fmt;
 use std::fmt::{Debug, Formatter};
+use std::mem::ManuallyDrop;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 use memory_pool::memory::Memory;
@@ -36,9 +37,8 @@ impl Context {
     /// It is unsafe because it only takes a reference of `Stack`. You have to make sure the
     /// `Stack` lives longer than the generated `Context`.
     #[inline(always)]
-    pub(crate) fn new(stack: NonNull<Memory>, f: ContextFn) -> Context {
-        let ptr = stack.as_ptr();
-        Context(unsafe { make_fcontext((*ptr).top(), (*ptr).len(), f) })
+    pub(crate) fn new(stack: ManuallyDrop<Memory>, f: ContextFn) -> Context {
+        Context(unsafe { make_fcontext(stack.top(), stack.len(), f) })
     }
 
     /// Yields the execution to another `Context`.
@@ -125,6 +125,7 @@ extern "C" {
 
 #[cfg(test)]
 mod tests {
+    use std::mem::ManuallyDrop;
     use std::os::raw::c_void;
     use std::ptr::NonNull;
     use memory_pool::memory::Memory;
@@ -154,7 +155,7 @@ mod tests {
         // Allocate some stack.
         let mut stack = Memory::default();
 
-        let context = Context::new(NonNull::new(&mut stack).expect("ptr is null"), context_function);
+        let context = Context::new(ManuallyDrop::new(stack), context_function);
         // Allocate a Context on the stack.
         let mut t = Transfer::new(context, 0 as *mut c_void);
 

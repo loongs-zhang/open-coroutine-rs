@@ -1,5 +1,6 @@
 use std::os::raw::c_void;
 use std::{ptr, thread};
+use std::mem::ManuallyDrop;
 use std::ptr::NonNull;
 use std::time::Duration;
 use memory_pool::memory::Memory;
@@ -29,7 +30,7 @@ pub enum Status {
 #[derive(Debug)]
 pub struct Coroutine<F> {
     //todo 增加id字段
-    stack: NonNull<Memory>,
+    stack: ManuallyDrop<Memory>,
     sp: Transfer,
     status: Status,
     //用户函数
@@ -80,13 +81,14 @@ impl<F> Coroutine<F>
         }
     }
 
-    pub fn new(stack: *mut Memory, proc: F, param: Option<*mut c_void>) -> Self {
-        let stack = NonNull::new(stack).expect("ptr can not be null !");
+    pub fn new(size: usize, proc: F, param: Option<*mut c_void>) -> Self {
+        let stack = memory_pool::allocate(size)
+            .expect("allocate stack failed !");
         Coroutine::init(stack, Status::Created, Box::new(proc), param, None)
         //todo 加到ready队列中，status再置为ready
     }
 
-    fn init(stack: NonNull<Memory>, status: Status,
+    fn init(stack: ManuallyDrop<Memory>, status: Status,
             proc: Box<F>, param: Option<*mut c_void>,
             next: Option<*mut Coroutine<F>>) -> Self {
         let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
@@ -147,7 +149,8 @@ impl<F> Coroutine<F> {
 
     pub fn exit(&mut self) {
         self.set_status(Status::Exited);
-        // self.stack.drop();
+        //只归还，不删除
+        memory_pool::revert(self.stack);
     }
 
     ///下方开始get/set
@@ -209,14 +212,12 @@ impl<F> Coroutine<F> {
 mod tests {
     use std::os::raw::c_void;
     use std::time::Duration;
-    use memory_pool::memory::Memory;
     use crate::coroutine::Coroutine;
 
     #[test]
     fn test() {
         println!("context test started !");
-        let mut stack = Memory::new(2048).expect("allocate stack failed !");
-        let mut c = Coroutine::new(&mut stack as *mut _ as *mut Memory, |param| {
+        let mut c = Coroutine::new(2048, |param| {
             match param {
                 Some(param) => {
                     print!("user_function {} => ", param as usize);
