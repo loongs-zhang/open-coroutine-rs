@@ -74,10 +74,9 @@ impl<F> Scheduler<F>
                         }
                         self.running = Some(ptr::read(&coroutine));
                         let result = coroutine.resume();
-                        coroutine.set_result(result.get_result());
                         //移动至"已完成"队列
-                        queue.push_back(ptr::read(&coroutine));
-                        self.finished.push_back(coroutine);
+                        queue.push_back(ptr::read(&result));
+                        self.finished.push_back(result);
                     }
                     None => {}
                 }
