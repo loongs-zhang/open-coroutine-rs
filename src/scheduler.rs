@@ -37,7 +37,7 @@ impl<F> Scheduler<F>
         self.ready.push_back(coroutine);
     }
 
-    pub fn schedule(&mut self) -> VecDeque<Coroutine<F>> {
+    pub fn try_schedule(&mut self) -> VecDeque<Coroutine<F>> {
         let mut queue = VecDeque::new();
         unsafe {
             for _ in 0..self.suspend.len() {
@@ -117,14 +117,14 @@ mod tests {
         coroutine.set_delay(Duration::from_millis(500))
             .set_status(Status::Suspend);
         scheduler.offer(coroutine);
-        scheduler.schedule();
+        scheduler.try_schedule();
         assert_eq!(0, scheduler.ready.len());
         assert_eq!(1, scheduler.suspend.len());
         let entry = scheduler.suspend.front().unwrap();
         assert_eq!(1, entry.len());
 
         scheduler.offer(Coroutine::new(2048, closure, Some(2usize as *mut c_void)));
-        for co in scheduler.schedule() {
+        for co in scheduler.try_schedule() {
             match co.get_result() {
                 Some(data) => {
                     println!("{}", data as usize)
@@ -135,7 +135,7 @@ mod tests {
 
         //往下睡500+ms，才会轮询到
         thread::sleep(Duration::from_millis(501));
-        for co in scheduler.schedule() {
+        for co in scheduler.try_schedule() {
             match co.get_result() {
                 Some(data) => {
                     println!("{}", data as usize)
