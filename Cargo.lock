@@ -98,6 +98,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "object-list"
+version = "0.1.0"
+
+[[package]]
 name = "once_cell"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -109,6 +113,7 @@ version = "0.1.0"
 dependencies = [
  "cc",
  "memory-pool",
+ "object-list",
  "rustversion",
 ]
 

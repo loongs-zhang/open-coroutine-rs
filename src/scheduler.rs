@@ -7,6 +7,7 @@ use crate::coroutine::{Coroutine, Status};
 use crate::timer;
 use crate::timer::{TimerEntry, TimerList};
 
+/// todo 用ObjectList代替VecDeque
 pub struct Scheduler<F> {
     ready: VecDeque<Coroutine<F>>,
     running: Option<Coroutine<F>>,
