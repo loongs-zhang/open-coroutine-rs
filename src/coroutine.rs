@@ -3,6 +3,7 @@ use std::{ptr, thread};
 use std::mem::ManuallyDrop;
 use std::ptr::NonNull;
 use std::time::Duration;
+use id_generator::IdGenerator;
 use memory_pool::memory::Memory;
 use crate::context::{Context, Transfer};
 use crate::timer;
@@ -29,7 +30,7 @@ pub enum Status {
 
 #[derive(Debug)]
 pub struct Coroutine<F: ?Sized> {
-    //todo 增加id字段
+    id: usize,
     stack: ManuallyDrop<Memory>,
     sp: Transfer,
     status: Status,
@@ -48,7 +49,7 @@ pub struct Coroutine<F: ?Sized> {
 }
 
 impl<F> Coroutine<F>
-    where F: FnOnce(Option<*mut c_void>) -> Option<*mut c_void>+Sized
+    where F: FnOnce(Option<*mut c_void>) -> Option<*mut c_void> + Sized
 {
     extern "C" fn coroutine_function(mut t: Transfer) {
         unsafe {
@@ -72,7 +73,8 @@ impl<F> Coroutine<F>
                 let func = ptr::read((*context).proc.as_ref());
                 let mut new_context = Coroutine::init(
                     //设置协程状态为已完成，resume的时候，已经调用完了用户函数
-                    (*context).stack, Status::Finished, Box::new(func), param, None);
+                    (*context).id, (*context).stack, Status::Finished,
+                    Box::new(func), param, None);
                 new_context.set_result(result);
                 //todo 不回跳，继续执行下一个ready的协程
                 t = t.resume(&mut new_context as *mut Coroutine<F> as *mut c_void);
@@ -83,17 +85,19 @@ impl<F> Coroutine<F>
     pub fn new(size: usize, proc: F, param: Option<*mut c_void>) -> Self {
         let stack = memory_pool::allocate(size)
             .expect("allocate stack failed !");
-        Coroutine::init(stack, Status::Created, Box::new(proc), param, None)
+        Coroutine::init(IdGenerator::next_id(), stack, Status::Created,
+                        Box::new(proc), param, None)
         //todo 加到ready队列中，status再置为ready
     }
 
-    fn init(stack: ManuallyDrop<Memory>, status: Status,
-            proc: Box<F>, param: Option<*mut c_void>,
+    fn init(id: usize, stack: ManuallyDrop<Memory>,
+            status: Status, proc: Box<F>, param: Option<*mut c_void>,
             next: Option<*mut Coroutine<F>>) -> Self {
         let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
         // Allocate a Context on the stack.
         let mut sp = Transfer::new(inner, 0 as *mut c_void);
         let mut context = Coroutine {
+            id,
             stack,
             sp,
             status,
@@ -160,6 +164,11 @@ impl<F: ?Sized> Coroutine<F> {
     }
 
     ///下方开始get/set
+    pub fn get_id(&self) -> usize {
+        let context = self.sp.data as *mut Coroutine<F>;
+        unsafe { (*context).id }
+    }
+
     pub fn set_param(&mut self, param: Option<*mut c_void>) -> &mut Self {
         unsafe {
             let context = self.sp.data as *mut Coroutine<F>;

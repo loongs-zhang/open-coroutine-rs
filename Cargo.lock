@@ -56,6 +56,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "id-generator"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+]
+
+[[package]]
 name = "kernel32-sys"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -112,6 +119,7 @@ name = "open-coroutine"
 version = "0.1.0"
 dependencies = [
  "cc",
+ "id-generator",
  "memory-pool",
  "object-list",
  "rustversion",

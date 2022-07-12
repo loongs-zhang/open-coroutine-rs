@@ -10,7 +10,8 @@ use crate::timer::{TimerEntry, TimerList};
 /// todo 用ObjectList代替VecDeque
 pub struct Scheduler<F> {
     ready: VecDeque<Coroutine<F>>,
-    running: Option<Coroutine<F>>,
+    //正在执行的协程id
+    running: Option<usize>,
     suspend: TimerList,
     //not support for now
     system_call: VecDeque<Coroutine<F>>,
@@ -73,7 +74,7 @@ impl<F> Scheduler<F>
                             self.suspend.insert(exec_time, coroutine);
                             continue;
                         }
-                        self.running = Some(ptr::read(&coroutine));
+                        self.running = Some(coroutine.get_id());
                         let result = coroutine.resume();
                         //移动至"已完成"队列
                         queue.push_back(ptr::read(&result));
