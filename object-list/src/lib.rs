@@ -1,10 +1,18 @@
 use std::collections::VecDeque;
+use std::ops::{Deref, DerefMut};
 use std::os::raw::c_void;
 use std::ptr;
 
 #[derive(Debug)]
 pub struct ObjectList {
     inner: VecDeque<*mut c_void>,
+}
+
+fn convert<T>(pointer: *mut c_void) -> Option<T> {
+    unsafe {
+        let node = Box::from_raw(pointer as *mut T);
+        Some(ptr::read(node.deref()))
+    }
 }
 
 impl ObjectList {
@@ -16,7 +24,7 @@ impl ObjectList {
         match self.inner.front() {
             Some(value) => {
                 unsafe {
-                    let result = ptr::read(value) as *const T;
+                    let result = ptr::read(value) as *mut T;
                     Some(&*result)
                 }
             }
@@ -43,7 +51,9 @@ impl ObjectList {
 
     pub fn pop_front<T>(&mut self) -> Option<T> {
         match self.inner.pop_front() {
-            Some(pointer) => Some(unsafe { ptr::read(pointer as *const T) }),
+            Some(pointer) => {
+                convert(pointer)
+            }
             None => None
         }
     }
@@ -52,7 +62,7 @@ impl ObjectList {
         match self.inner.back() {
             Some(value) => {
                 unsafe {
-                    let result = ptr::read(value) as *const T;
+                    let result = ptr::read(value) as *mut T;
                     Some(&*result)
                 }
             }
@@ -79,7 +89,9 @@ impl ObjectList {
 
     pub fn pop_back<T>(&mut self) -> Option<T> {
         match self.inner.pop_back() {
-            Some(pointer) => Some(unsafe { ptr::read(pointer as *const T) }),
+            Some(pointer) => {
+                convert(pointer)
+            }
             None => None
         }
     }
