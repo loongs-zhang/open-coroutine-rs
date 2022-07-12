@@ -28,7 +28,7 @@ pub enum Status {
 }
 
 #[derive(Debug)]
-pub struct Coroutine<F> {
+pub struct Coroutine<F: ?Sized> {
     //todo 增加id字段
     stack: ManuallyDrop<Memory>,
     sp: Transfer,
@@ -48,7 +48,7 @@ pub struct Coroutine<F> {
 }
 
 impl<F> Coroutine<F>
-    where F: FnOnce(Option<*mut c_void>) -> Option<*mut c_void>
+    where F: FnOnce(Option<*mut c_void>) -> Option<*mut c_void>+Sized
 {
     extern "C" fn coroutine_function(mut t: Transfer) {
         unsafe {
@@ -67,10 +67,9 @@ impl<F> Coroutine<F>
                     None => { print!("coroutine_function no param => ") }
                 }
                 //调用用户函数
-                let mut func = ptr::read((*context).proc.as_ref());
-                let result = func(param);
+                let result = (*context).invoke();
                 //返回新的上下文
-                func = ptr::read((*context).proc.as_ref());
+                let func = ptr::read((*context).proc.as_ref());
                 let mut new_context = Coroutine::init(
                     //设置协程状态为已完成，resume的时候，已经调用完了用户函数
                     (*context).stack, Status::Finished, Box::new(func), param, None);
@@ -109,9 +108,16 @@ impl<F> Coroutine<F>
         context.sp.data = &mut context as *mut Coroutine<F> as *mut c_void;
         context
     }
+
+    fn invoke(&self) -> Option<*mut c_void> {
+        unsafe {
+            let mut func = ptr::read(self.proc.as_ref());
+            func(self.param)
+        }
+    }
 }
 
-impl<F> Coroutine<F> {
+impl<F: ?Sized> Coroutine<F> {
     pub fn resume(&self) -> Self {
         //使用构造方法传入的参数，直接切换上下文
         self.switch(&self.sp)
