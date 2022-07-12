@@ -11,7 +11,7 @@ use crate::timer::{TimerEntry, TimerList};
 pub struct Scheduler<F> {
     ready: VecDeque<Coroutine<F>>,
     running: Option<Coroutine<F>>,
-    suspend: TimerList<Coroutine<F>>,
+    suspend: TimerList,
     //not support for now
     system_call: VecDeque<Coroutine<F>>,
     //not support for now

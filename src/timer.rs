@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use crate::coroutine::Coroutine;
+use object_list::ObjectList;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 
@@ -25,14 +25,14 @@ pub(crate) fn get_timeout_time(dur: Duration) -> u64 {
 }
 
 #[derive(Debug)]
-pub struct TimerEntry<T> {
+pub struct TimerEntry {
     time: u64,
-    dequeue: VecDeque<T>,
+    dequeue: ObjectList,
 }
 
-impl<T> TimerEntry<T> {
+impl TimerEntry {
     pub fn new(time: u64) -> Self {
-        TimerEntry { time, dequeue: VecDeque::new() }
+        TimerEntry { time, dequeue: ObjectList::new() }
     }
 
     pub fn len(&self) -> usize {
@@ -43,21 +43,21 @@ impl<T> TimerEntry<T> {
         self.time
     }
 
-    pub fn pop_front(&mut self) -> Option<T> {
+    pub fn pop_front<T>(&mut self) -> Option<T> {
         self.dequeue.pop_front()
     }
 
-    pub fn push_back(&mut self, t: T) {
+    pub fn push_back<T>(&mut self, t: T) {
         self.dequeue.push_back(t)
     }
 }
 
 #[derive(Debug)]
-pub struct TimerList<T> {
-    dequeue: VecDeque<TimerEntry<T>>,
+pub struct TimerList {
+    dequeue: VecDeque<TimerEntry>,
 }
 
-impl<T> TimerList<T> {
+impl TimerList {
     pub fn new() -> Self {
         TimerList {
             dequeue: VecDeque::new(),
@@ -68,7 +68,7 @@ impl<T> TimerList<T> {
         self.dequeue.len()
     }
 
-    pub fn insert(&mut self, time: u64, t: T) {
+    pub fn insert<T>(&mut self, time: u64, t: T) {
         let index = self.dequeue.binary_search_by(|x| x.time.cmp(&time))
             .unwrap_or_else(|x| x);
         match self.dequeue.get_mut(index) {
@@ -83,11 +83,11 @@ impl<T> TimerList<T> {
         }
     }
 
-    pub fn front(&self) -> Option<&TimerEntry<T>> {
+    pub fn front(&self) -> Option<&TimerEntry> {
         self.dequeue.front()
     }
 
-    pub fn pop_front(&mut self) -> Option<TimerEntry<T>> {
+    pub fn pop_front(&mut self) -> Option<TimerEntry> {
         self.dequeue.pop_front()
     }
 }
@@ -111,6 +111,6 @@ mod tests {
 
         let mut entry = list.pop_front().unwrap();
         assert_eq!(entry.len(), 1);
-        assert!(entry.pop_front().is_some());
+        assert!(entry.pop_front::<i32>().is_some());
     }
 }

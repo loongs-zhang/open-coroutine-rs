@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::os::raw::c_void;
 use std::ptr;
 
+#[derive(Debug)]
 pub struct ObjectList {
     inner: VecDeque<*mut c_void>,
 }
