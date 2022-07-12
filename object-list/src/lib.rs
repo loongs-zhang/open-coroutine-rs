@@ -58,6 +58,16 @@ impl ObjectList {
         }
     }
 
+    /// 如果是闭包，还是要获取裸指针再手动转换，不然类型有问题
+    pub fn pop_front_raw(&mut self) -> Option<*mut c_void> {
+        match self.inner.pop_front() {
+            Some(pointer) => {
+                Some(pointer)
+            }
+            None => None
+        }
+    }
+
     pub fn back<T>(&mut self) -> Option<&T> {
         match self.inner.back() {
             Some(value) => {

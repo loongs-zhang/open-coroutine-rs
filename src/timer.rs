@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::os::raw::c_void;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use object_list::ObjectList;
 
@@ -45,6 +46,10 @@ impl TimerEntry {
 
     pub fn pop_front<T>(&mut self) -> Option<T> {
         self.dequeue.pop_front()
+    }
+
+    pub fn pop_front_raw(&mut self) -> Option<*mut c_void> {
+        self.dequeue.pop_front_raw()
     }
 
     pub fn push_back<T>(&mut self, t: T) {
