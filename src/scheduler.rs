@@ -86,6 +86,7 @@ impl Scheduler {
                         }
                         self.running = Some(coroutine.get_id());
                         let result = coroutine.resume();
+                        self.running = None;
                         //移动至"已完成"队列
                         queue.push_back(ptr::read(&result));
                         self.finished.push_back(result);
