@@ -53,9 +53,8 @@ impl Scheduler {
                                 for _ in 0..entry.len() {
                                     match entry.pop_front_raw() {
                                         Some(pointer) => {
-                                            let mut coroutine = unsafe {
-                                                ptr::read(pointer as *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
-                                            };
+                                            let mut coroutine = ptr::read(pointer as
+                                                *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>);
                                             coroutine.set_status(Status::Ready);
                                             self.ready.push_back(coroutine)
                                         }
@@ -72,9 +71,8 @@ impl Scheduler {
             for _ in 0..self.ready.len() {
                 match self.ready.pop_front_raw() {
                     Some(mut pointer) => {
-                        let mut coroutine = unsafe {
-                            ptr::read(pointer as *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
-                        };
+                        let mut coroutine = ptr::read(pointer as
+                            *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>);
                         //fixme 这里拿到的时间不对
                         let exec_time = coroutine.get_execute_time();
                         if timer::now() < exec_time {

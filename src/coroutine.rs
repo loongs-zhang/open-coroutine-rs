@@ -43,9 +43,9 @@ pub struct Coroutine<F: ?Sized> {
     //下一次应该执行协程体的时间
     exec_time: u64,
     //下一个执行的协程
-    next: Option<*mut Coroutine<F>>,
+    next: Option<*mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>>,
     //入口协程，也是出口
-    entrance: Option<*mut Coroutine<F>>,
+    entrance: Option<*mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>>,
 }
 
 impl<F> Coroutine<F>
@@ -87,12 +87,11 @@ impl<F> Coroutine<F>
             .expect("allocate stack failed !");
         Coroutine::init(IdGenerator::next_id(), stack, Status::Created,
                         Box::new(proc), param, None)
-        //todo 加到ready队列中，status再置为ready
     }
 
     fn init(id: usize, stack: ManuallyDrop<Memory>,
             status: Status, proc: Box<F>, param: Option<*mut c_void>,
-            next: Option<*mut Coroutine<F>>) -> Self {
+            next: Option<*mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>>) -> Self {
         let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
         // Allocate a Context on the stack.
         let mut sp = Transfer::new(inner, 0 as *mut c_void);
@@ -113,10 +112,12 @@ impl<F> Coroutine<F>
         context
     }
 
-    fn invoke(&self) -> Option<*mut c_void> {
+    fn invoke(&mut self) -> Option<*mut c_void> {
         unsafe {
             let mut func = ptr::read(self.proc.as_ref());
-            func(self.param)
+            let result = func(self.param);
+            self.set_result(result);
+            result
         }
     }
 }
@@ -170,6 +171,7 @@ impl<F: ?Sized> Coroutine<F> {
     }
 
     pub fn set_param(&mut self, param: Option<*mut c_void>) -> &mut Self {
+        self.param = param;
         unsafe {
             let context = self.sp.data as *mut Coroutine<F>;
             (*context).param = param;
@@ -183,6 +185,7 @@ impl<F: ?Sized> Coroutine<F> {
     }
 
     pub fn set_result(&mut self, result: Option<*mut c_void>) -> &mut Self {
+        self.result = result;
         unsafe {
             let context = self.sp.data as *mut Coroutine<F>;
             (*context).result = result;
@@ -196,6 +199,7 @@ impl<F: ?Sized> Coroutine<F> {
     }
 
     pub(crate) fn set_status(&mut self, status: Status) -> &mut Self {
+        self.status = status;
         unsafe {
             let context = self.sp.data as *mut Coroutine<F>;
             (*context).status = status;
@@ -209,10 +213,12 @@ impl<F: ?Sized> Coroutine<F> {
     }
 
     pub fn set_delay(&mut self, delay: Duration) -> &mut Self {
+        let time = timer::get_timeout_time(delay);
         //覆盖执行时间
+        self.exec_time = time;
         unsafe {
             let context = self.sp.data as *mut Coroutine<F>;
-            (*context).exec_time = timer::get_timeout_time(delay);
+            (*context).exec_time = time;
         }
         self
     }
