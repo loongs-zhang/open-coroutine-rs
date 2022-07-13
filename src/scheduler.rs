@@ -34,6 +34,11 @@ impl Scheduler {
     }
 
     pub fn execute(&mut self, mut coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
+        let time = coroutine.get_execute_time();
+        if timer::now() < time {
+            self.execute_at(time, coroutine);
+            return;
+        }
         coroutine.set_status(Status::Ready);
         self.ready.push_back(coroutine);
     }
