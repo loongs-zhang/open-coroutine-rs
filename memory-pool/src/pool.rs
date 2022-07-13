@@ -65,9 +65,10 @@ impl SizedMemoryPool {
         self.available.push(stack);
     }
 
-    pub fn drop(&mut self, stack: ManuallyDrop<Memory>) {
+    pub fn drop(&mut self, mut stack: ManuallyDrop<Memory>) {
         self.delete_using(&stack);
         stack.drop();
+        unsafe { ManuallyDrop::drop(&mut stack) };
     }
 
     pub fn available(&self) -> &Worker<ManuallyDrop<Memory>> {
