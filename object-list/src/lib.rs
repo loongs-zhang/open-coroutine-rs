@@ -11,7 +11,7 @@ pub struct ObjectList {
 fn convert<T>(pointer: *mut c_void) -> Option<T> {
     unsafe {
         let node = Box::from_raw(pointer as *mut T);
-        Some(ptr::read(node.deref()))
+        Some(*node)
     }
 }
 
