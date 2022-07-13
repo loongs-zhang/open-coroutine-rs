@@ -214,6 +214,15 @@ impl<F: ?Sized> Coroutine<F> {
 
     pub fn set_delay(&mut self, delay: Duration) -> &mut Self {
         let time = timer::get_timeout_time(delay);
+        self.set_execute_time(time)
+    }
+
+    pub fn get_execute_time(&self) -> u64 {
+        let context = self.sp.data as *mut Coroutine<F>;
+        unsafe { (*context).exec_time }
+    }
+
+    pub fn set_execute_time(&mut self, time: u64) -> &mut Self {
         //覆盖执行时间
         self.exec_time = time;
         unsafe {
@@ -221,11 +230,6 @@ impl<F: ?Sized> Coroutine<F> {
             (*context).exec_time = time;
         }
         self
-    }
-
-    pub fn get_execute_time(&self) -> u64 {
-        let context = self.sp.data as *mut Coroutine<F>;
-        unsafe { (*context).exec_time }
     }
 }
 

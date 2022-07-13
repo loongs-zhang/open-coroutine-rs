@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, VecDeque};
 use std::hash::Hash;
 use std::os::raw::c_void;
 use std::ptr;
+use std::time::Duration;
 use object_list::ObjectList;
 use crate::coroutine::{Coroutine, Status};
 use crate::timer;
@@ -32,13 +33,24 @@ impl Scheduler {
         }
     }
 
-    pub fn offer(&mut self, mut coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
+    pub fn execute(&mut self, mut coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
         coroutine.set_status(Status::Ready);
         self.ready.push_back(coroutine);
     }
 
+    pub fn delay(&mut self, delay: Duration, mut coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
+        let time = timer::get_timeout_time(delay);
+        self.execute_at(time, coroutine)
+    }
+
+    pub fn execute_at(&mut self, time: u64, mut coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
+        coroutine.set_execute_time(time)
+            .set_status(Status::Suspend);
+        self.suspend.insert(time, coroutine);
+    }
+
     pub fn try_schedule(&mut self) -> ObjectList {
-        let mut queue = ObjectList::new();
+        let mut scheduled = ObjectList::new();
         unsafe {
             for _ in 0..self.suspend.len() {
                 match self.suspend.front() {
@@ -86,7 +98,7 @@ impl Scheduler {
                         let result = coroutine.resume();
                         self.running = None;
                         //移动至"已完成"队列
-                        queue.push_back(ptr::read(&result));
+                        scheduled.push_back(ptr::read(&result));
                         self.finished.push_back(result);
                         coroutine.exit();
                         //fixme 修复内存泄漏问题
@@ -95,7 +107,7 @@ impl Scheduler {
                     None => {}
                 }
             }
-            queue
+            scheduled
         }
     }
 
@@ -118,7 +130,7 @@ mod tests {
         let x = 1;
         let y = 2;
         let mut scheduler = Scheduler::new();
-        scheduler.offer(Coroutine::new(2048, |param| {
+        scheduler.execute(Coroutine::new(2048, |param| {
             println!("\nenv {}", x);
             match param {
                 Some(param) => {
@@ -130,7 +142,7 @@ mod tests {
             }
             param
         }, Some(1usize as *mut c_void)));
-        scheduler.offer(Coroutine::new(2048, |param| {
+        scheduler.execute(Coroutine::new(2048, |param| {
             println!("\nenv {}", y);
             match param {
                 Some(param) => {
@@ -151,39 +163,37 @@ mod tests {
         let mut coroutine = Coroutine::new(2048, |param| {
             match param {
                 Some(param) => {
-                    println!("user_function {}", param as usize);
+                    println!("user_function1 {}", param as usize);
                 }
                 None => {
-                    println!("user_function no param");
+                    println!("user_function1 no param");
                 }
             }
             param
         }, Some(1usize as *mut c_void));
-        coroutine.set_delay(Duration::from_millis(500));
-        scheduler.offer(coroutine);
-        scheduler.try_schedule();
+        scheduler.delay(Duration::from_millis(500), coroutine);
+        assert_eq!(0, scheduler.try_schedule().len());
         assert_eq!(0, scheduler.ready.len());
-        //fixme
         assert_eq!(1, scheduler.suspend.len());
         let entry = scheduler.suspend.front().unwrap();
         assert_eq!(1, entry.len());
 
-        scheduler.offer(Coroutine::new(2048, |param| {
+        scheduler.execute(Coroutine::new(2048, |param| {
             match param {
                 Some(param) => {
-                    println!("user_function {}", param as usize);
+                    println!("user_function2 {}", param as usize);
                 }
                 None => {
-                    println!("user_function no param");
+                    println!("user_function2 no param");
                 }
             }
             param
         }, Some(2usize as *mut c_void)));
-        scheduler.try_schedule();
+        assert_eq!(1, scheduler.try_schedule().len());
 
         //往下睡500+ms，才会轮询到
         thread::sleep(Duration::from_millis(501));
-        scheduler.try_schedule();
+        assert_eq!(1, scheduler.try_schedule().len());
         assert_eq!(0, scheduler.ready.len());
         assert_eq!(0, scheduler.suspend.len());
     }
