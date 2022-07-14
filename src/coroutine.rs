@@ -135,7 +135,7 @@ impl<F: ?Sized> Coroutine<F> {
         self.switch(&self.sp)
     }
 
-    pub fn resume_to(&self, to: &Coroutine<F>) -> Self {
+    pub fn resume_to(&self, to: &Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) -> Self {
         self.switch(&to.sp)
     }
 

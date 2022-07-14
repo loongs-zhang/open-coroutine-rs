@@ -22,6 +22,7 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
+    //todo 支持从thread_local中获取Scheduler，没有则创建？
     pub fn new() -> Self {
         Scheduler {
             ready: ObjectList::new(),
@@ -116,6 +117,12 @@ impl Scheduler {
         }
     }
 
+    pub fn schedule(&mut self) {
+        while self.suspend.len() > 0 || self.ready.len() > 0 {
+            self.try_schedule();
+        }
+    }
+
     pub fn get_finished(&self) -> &ObjectList {
         &self.finished
     }
@@ -201,5 +208,20 @@ mod tests {
         assert_eq!(1, scheduler.try_schedule().len());
         assert_eq!(0, scheduler.ready.len());
         assert_eq!(0, scheduler.suspend.len());
+    }
+
+    #[test]
+    fn schedule() {
+        let mut scheduler = Scheduler::new();
+        scheduler.delay(Duration::from_millis(500), Coroutine::new(2048, |param| {
+            println!("coroutine1");
+            param
+        }, None));
+        scheduler.execute(Coroutine::new(2048, |param| {
+            println!("coroutine2");
+            param
+        }, None));
+        scheduler.schedule();
+        assert_eq!(2, scheduler.get_finished().len());
     }
 }
