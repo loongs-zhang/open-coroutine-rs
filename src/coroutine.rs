@@ -5,6 +5,7 @@ use std::ptr::NonNull;
 use std::time::Duration;
 use id_generator::IdGenerator;
 use memory_pool::memory::Memory;
+use object_list::ObjectList;
 use crate::context::{Context, Transfer};
 use crate::timer;
 
@@ -42,10 +43,11 @@ pub struct Coroutine<F: ?Sized> {
     result: Option<*mut c_void>,
     //下一次应该执行协程体的时间
     exec_time: u64,
-    //下一个执行的协程
-    next: Option<*mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>>,
-    //入口协程，也是出口
-    entrance: Option<*mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>>,
+    //前置依赖的协程
+    //todo 构建依赖数
+    dependencies: ManuallyDrop<ObjectList>,
+    //是否已经调用过用户函数
+    invoked: bool,
 }
 
 impl<F> Coroutine<F>
@@ -55,6 +57,20 @@ impl<F> Coroutine<F>
         unsafe {
             loop {
                 let context = t.data as *mut Coroutine<F>;
+                let mut dependencies = ptr::read((*context).dependencies.as_ref());
+                if !dependencies.is_empty() {
+                    //优先调用它的依赖项
+                    for _ in 0..dependencies.len() {
+                        match dependencies.pop_front_raw() {
+                            Some(mut pointer) => {
+                                let dependency = pointer as
+                                    *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>;
+                                std::mem::forget((*dependency).resume());
+                            }
+                            None => {}
+                        }
+                    }
+                }
                 if timer::now() < (*context).exec_time {
                     //让出CPU的执行权
                     thread::yield_now();
@@ -68,15 +84,19 @@ impl<F> Coroutine<F>
                     None => { print!("coroutine_function no param => ") }
                 }
                 //调用用户函数
-                let result = (*context).invoke();
+                let result = if (*context).invoked {
+                    (*context).result
+                } else {
+                    (*context).invoke()
+                };
                 //返回新的上下文
                 let func = ptr::read((*context).proc.as_ref());
                 let mut new_context = Coroutine::init(
                     //设置协程状态为已完成，resume的时候，已经调用完了用户函数
                     (*context).id, (*context).stack, Status::Finished,
-                    Box::new(func), param, None);
+                    Box::new(func), param,
+                    ManuallyDrop::new(dependencies), true);
                 new_context.set_result(result);
-                //todo 不回跳，继续执行下一个ready的协程
                 t = t.resume(&mut new_context as *mut Coroutine<F> as *mut c_void);
             }
         }
@@ -86,12 +106,14 @@ impl<F> Coroutine<F>
         let stack = memory_pool::allocate(size)
             .expect("allocate stack failed !");
         Coroutine::init(IdGenerator::next_id(), stack, Status::Created,
-                        Box::new(proc), param, None)
+                        Box::new(proc), param,
+                        ManuallyDrop::new(ObjectList::new()),
+                        false)
     }
 
     fn init(id: usize, stack: ManuallyDrop<Memory>,
             status: Status, proc: Box<F>, param: Option<*mut c_void>,
-            next: Option<*mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>>) -> Self {
+            dependencies: ManuallyDrop<ObjectList>, invoked: bool) -> Self {
         let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
         // Allocate a Context on the stack.
         let mut sp = Transfer::new(inner, 0 as *mut c_void);
@@ -105,8 +127,8 @@ impl<F> Coroutine<F>
             result: None,
             //默认轮询到了立刻执行
             exec_time: 0,
-            next,
-            entrance: None,
+            dependencies,
+            invoked,
         };
         context.sp.data = &mut context as *mut Coroutine<F> as *mut c_void;
         context
@@ -117,6 +139,8 @@ impl<F> Coroutine<F>
             let mut func = ptr::read(self.proc.as_ref());
             let result = func(self.param);
             self.set_result(result);
+            self.invoked = true;
+            self.set_status(Status::Finished);
             result
         }
     }
@@ -164,6 +188,15 @@ impl<F: ?Sized> Coroutine<F> {
         memory_pool::revert(self.stack);
     }
 
+    pub fn add_dependency(&mut self, dependency: &mut Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) -> &mut Self {
+        let pointer = dependency as *mut _ as *mut c_void;
+        unsafe {
+            let context = self.sp.data as *mut Coroutine<F>;
+            (*context).dependencies.push_back_raw(pointer);
+        }
+        self
+    }
+
     ///下方开始get/set
     pub fn get_id(&self) -> usize {
         let context = self.sp.data as *mut Coroutine<F>;
@@ -171,7 +204,6 @@ impl<F: ?Sized> Coroutine<F> {
     }
 
     pub fn set_param(&mut self, param: Option<*mut c_void>) -> &mut Self {
-        self.param = param;
         unsafe {
             let context = self.sp.data as *mut Coroutine<F>;
             (*context).param = param;
@@ -236,6 +268,7 @@ impl<F: ?Sized> Coroutine<F> {
 #[cfg(test)]
 mod tests {
     use std::os::raw::c_void;
+    use std::ptr;
     use std::time::Duration;
     use crate::coroutine::Coroutine;
 
@@ -263,5 +296,24 @@ mod tests {
         }
         c.exit();
         println!("context test finished!");
+    }
+
+    #[test]
+    fn next() {
+        let mut head = Coroutine::new(2048, |param| {
+            println!("1");
+            param
+        }, None);
+        let mut middle = Coroutine::new(2048, |param| {
+            println!("2");
+            param
+        }, None);
+        let mut tail = Coroutine::new(2048, |param| {
+            println!("3");
+            param
+        }, None);
+        middle.add_dependency(&mut head);
+        tail.add_dependency(&mut middle);
+        tail.resume();
     }
 }

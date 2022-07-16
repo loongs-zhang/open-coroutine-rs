@@ -49,6 +49,10 @@ impl ObjectList {
         self.inner.push_front(ptr as *mut _ as *mut c_void);
     }
 
+    pub fn push_front_raw(&mut self, ptr: *mut c_void) {
+        self.inner.push_front(ptr);
+    }
+
     pub fn pop_front<T>(&mut self) -> Option<T> {
         match self.inner.pop_front() {
             Some(pointer) => {
@@ -90,6 +94,10 @@ impl ObjectList {
     pub fn push_back<T>(&mut self, element: T) {
         let ptr = Box::leak(Box::new(element));
         self.inner.push_back(ptr as *mut _ as *mut c_void);
+    }
+
+    pub fn push_back_raw(&mut self, ptr: *mut c_void) {
+        self.inner.push_back(ptr);
     }
 
     pub fn pop_back<T>(&mut self) -> Option<T> {
@@ -136,6 +144,18 @@ impl ObjectList {
 
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
+    }
+}
+
+impl AsRef<ObjectList> for ObjectList {
+    fn as_ref(&self) -> &ObjectList {
+        &*self
+    }
+}
+
+impl AsMut<ObjectList> for ObjectList {
+    fn as_mut(&mut self) -> &mut ObjectList {
+        &mut *self
     }
 }
 
