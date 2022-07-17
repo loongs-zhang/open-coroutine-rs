@@ -86,6 +86,7 @@ impl Scheduler {
                     None => {}
                 }
             }
+            //过滤未到执行时间的协程
             for _ in 0..self.ready.len() {
                 match self.ready.pop_front_raw() {
                     Some(mut pointer) => {
@@ -100,6 +101,17 @@ impl Scheduler {
                             self.suspend.insert(exec_time, coroutine);
                             continue;
                         }
+                        self.ready.push_back_raw(pointer);
+                        std::mem::forget(coroutine);
+                    }
+                    None => {}
+                }
+            }
+            for _ in 0..self.ready.len() {
+                match self.ready.pop_front_raw() {
+                    Some(mut pointer) => {
+                        let mut coroutine = ptr::read(pointer as
+                            *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>);
                         self.running = Some(coroutine.get_id());
                         let result = coroutine.resume();
                         self.running = None;
