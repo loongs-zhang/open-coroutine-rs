@@ -24,7 +24,7 @@ impl ObjectList {
         match self.inner.front() {
             Some(value) => {
                 unsafe {
-                    let result = ptr::read(value) as *mut T;
+                    let result = ptr::read_unaligned(value) as *mut T;
                     Some(&*result)
                 }
             }
@@ -36,7 +36,7 @@ impl ObjectList {
         match self.inner.front_mut() {
             Some(value) => {
                 unsafe {
-                    let mut result = ptr::read(value) as *mut T;
+                    let mut result = ptr::read_unaligned(value) as *mut T;
                     Some(&mut *result)
                 }
             }
@@ -71,7 +71,7 @@ impl ObjectList {
         match self.inner.back() {
             Some(value) => {
                 unsafe {
-                    let result = ptr::read(value) as *mut T;
+                    let result = ptr::read_unaligned(value) as *mut T;
                     Some(&*result)
                 }
             }
@@ -83,7 +83,7 @@ impl ObjectList {
         match self.inner.back_mut() {
             Some(value) => {
                 unsafe {
-                    let mut result = ptr::read(value) as *mut T;
+                    let mut result = ptr::read_unaligned(value) as *mut T;
                     Some(&mut *result)
                 }
             }
@@ -122,7 +122,7 @@ impl ObjectList {
         match self.inner.get(index) {
             Some(val) => {
                 unsafe {
-                    let result = ptr::read(val) as *mut T;
+                    let result = ptr::read_unaligned(val) as *mut T;
                     Some(&*result)
                 }
             }
@@ -134,7 +134,7 @@ impl ObjectList {
         match self.inner.get_mut(index) {
             Some(val) => {
                 unsafe {
-                    let result = ptr::read(val) as *mut T;
+                    let result = ptr::read_unaligned(val) as *mut T;
                     Some(&mut *result)
                 }
             }

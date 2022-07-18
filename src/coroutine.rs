@@ -89,7 +89,7 @@ impl<F> Coroutine<F>
                     }
                 }
                 //返回新的上下文
-                let func = ptr::read((*context).proc.as_ref());
+                let func = ptr::read_unaligned((*context).proc.as_ref());
                 let mut new_context = Coroutine::init(
                     //设置协程状态为已完成，resume的时候，已经调用完了用户函数
                     (*context).id, (*context).stack, Status::Finished,
@@ -132,7 +132,7 @@ impl<F> Coroutine<F>
 
     fn invoke(&mut self) -> Option<*mut c_void> {
         unsafe {
-            let mut func = ptr::read(self.proc.as_ref());
+            let mut func = ptr::read_unaligned(self.proc.as_ref());
             let result = func(self.param);
             self.set_result(result);
             self.set_status(Status::Finished);
@@ -161,7 +161,7 @@ impl<F: ?Sized> Coroutine<F> {
     fn switch(&self, to: &Transfer) -> Self {
         let mut sp = Transfer::switch(to);
         let context = sp.data as *mut Coroutine<F>;
-        unsafe { ptr::read(context) }
+        unsafe { ptr::read_unaligned(context) }
     }
 
     pub fn delay(&mut self, delay: Duration) -> Self {
@@ -261,9 +261,9 @@ impl<F: ?Sized> Coroutine<F> {
         self
     }
 
-    pub(crate) fn set_entrance(&mut self, entrance: &mut Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) -> &mut Self {
+    pub(crate) fn set_entrance(&mut self, entrance: &Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) -> &mut Self {
         unsafe {
-            let mut entrance = ptr::read(entrance.sp.context.0);
+            let mut entrance = ptr::read_unaligned(entrance.sp.context.0);
             let pointer = &mut entrance as *mut c_void;
             self.entrance = Some(pointer);
             let context = self.sp.data as *mut Coroutine<F>;
@@ -324,7 +324,7 @@ mod tests {
         middle.set_next(&mut tail);
 
         //设置出口为主线程
-        tail.set_entrance(&mut head);
+        tail.set_entrance(&head);
         head.resume();
     }
 }
