@@ -251,8 +251,17 @@ impl<F: ?Sized> Coroutine<F> {
         self
     }
 
-    pub fn set_next(&mut self, next: &mut Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) -> &mut Self {
+    pub fn get_next(&self) -> Option<*mut c_void> {
+        let context = self.sp.data as *mut Coroutine<F>;
+        unsafe { (*context).next }
+    }
+
+    pub fn set_next(&mut self, next: &mut Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void> + ?Sized>) -> &mut Self {
         let pointer = next as *mut _ as *mut c_void;
+        self.set_next_ptr(pointer)
+    }
+
+    pub fn set_next_ptr(&mut self, pointer: *mut c_void) -> &mut Self {
         self.next = Some(pointer);
         unsafe {
             let context = self.sp.data as *mut Coroutine<F>;
@@ -261,7 +270,16 @@ impl<F: ?Sized> Coroutine<F> {
         self
     }
 
-    pub(crate) fn set_entrance(&mut self, entrance: &Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) -> &mut Self {
+    pub fn has_next(&self) -> bool {
+        self.next.is_some()
+    }
+
+    pub fn get_entrance(&self) -> Option<*mut c_void> {
+        let context = self.sp.data as *mut Coroutine<F>;
+        unsafe { (*context).entrance }
+    }
+
+    pub(crate) fn set_entrance(&mut self, entrance: &Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void> + ?Sized>) -> &mut Self {
         unsafe {
             let mut entrance = ptr::read_unaligned(entrance.sp.context.0);
             let pointer = &mut entrance as *mut c_void;

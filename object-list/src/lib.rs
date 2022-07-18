@@ -44,6 +44,15 @@ impl ObjectList {
         }
     }
 
+    pub fn front_mut_raw(&mut self) -> Option<*mut c_void> {
+        match self.inner.front_mut() {
+            Some(value) => {
+                unsafe { Some(ptr::read_unaligned(value)) }
+            }
+            None => None
+        }
+    }
+
     pub fn push_front<T>(&mut self, element: T) {
         let ptr = Box::leak(Box::new(element));
         self.inner.push_front(ptr as *mut _ as *mut c_void);
@@ -86,6 +95,15 @@ impl ObjectList {
                     let mut result = ptr::read_unaligned(value) as *mut T;
                     Some(&mut *result)
                 }
+            }
+            None => None
+        }
+    }
+
+    pub fn back_mut_raw(&mut self) -> Option<*mut c_void> {
+        match self.inner.back_mut() {
+            Some(value) => {
+                unsafe { Some(ptr::read_unaligned(value)) }
             }
             None => None
         }
@@ -142,6 +160,15 @@ impl ObjectList {
         }
     }
 
+    pub fn get_mut_raw(&mut self, index: usize) -> Option<*mut c_void> {
+        match self.inner.get_mut(index) {
+            Some(pointer) => {
+                unsafe { Some(ptr::read_unaligned(pointer)) }
+            }
+            None => None
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
@@ -169,11 +196,15 @@ mod tests {
         assert!(list.is_empty());
         list.push_back(1);
         assert_eq!(&1, list.front().unwrap());
+        assert_eq!(&1, list.front().unwrap());
         assert!(!list.is_empty());
         list.push_back(true);
         assert_eq!(&true, list.back().unwrap());
+        assert_eq!(&true, list.back().unwrap());
 
         assert_eq!(&1, list.get(0).unwrap());
+        assert_eq!(&1, list.get(0).unwrap());
+        assert_eq!(&true, list.get_mut(1).unwrap());
         assert_eq!(&true, list.get_mut(1).unwrap());
 
         let b: bool = list.pop_back().unwrap();

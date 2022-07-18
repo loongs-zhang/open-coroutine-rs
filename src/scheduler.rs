@@ -129,10 +129,15 @@ impl Scheduler {
         }
     }
 
-    pub fn schedule(&mut self) {
+    pub fn schedule(&mut self) -> ObjectList {
+        let mut scheduled = ObjectList::new();
         while self.suspend.len() > 0 || self.ready.len() > 0 {
-            self.try_schedule();
+            let mut temp = self.try_schedule();
+            while !temp.is_empty() {
+                scheduled.push_back_raw(temp.pop_front_raw().unwrap());
+            }
         }
+        scheduled
     }
 
     pub fn get_finished(&self) -> &ObjectList {
@@ -233,7 +238,6 @@ mod tests {
             println!("coroutine2");
             param
         }, None));
-        scheduler.schedule();
-        assert_eq!(2, scheduler.get_finished().len());
+        assert_eq!(2, scheduler.schedule().len());
     }
 }
