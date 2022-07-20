@@ -1,13 +1,10 @@
-use std::borrow::Borrow;
-use std::collections::{BTreeMap, VecDeque};
-use std::hash::Hash;
 use std::os::raw::c_void;
 use std::ptr;
 use std::time::Duration;
 use object_list::ObjectList;
-use crate::coroutine::{Coroutine, Status};
-use crate::timer;
-use crate::timer::{TimerEntry, TimerList};
+use open_coroutine::coroutine::{Coroutine, Status};
+use open_coroutine::timer;
+use open_coroutine::timer::TimerList;
 
 #[derive(Debug, PartialEq)]
 pub struct Scheduler {
@@ -157,12 +154,11 @@ impl Scheduler {
 
 #[cfg(test)]
 mod tests {
-    use std::{mem, thread};
     use std::os::raw::c_void;
+    use std::thread;
     use std::time::Duration;
-    use memory_pool::memory::Memory;
-    use crate::coroutine::{Coroutine, Status};
-    use crate::scheduler::Scheduler;
+    use open_coroutine::coroutine::Coroutine;
+    use crate::Scheduler;
 
     #[test]
     fn simple() {

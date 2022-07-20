@@ -217,7 +217,7 @@ impl<F: ?Sized> Coroutine<F> {
         unsafe { (*context).result }
     }
 
-    pub(crate) fn set_status(&mut self, status: Status) -> &mut Self {
+    pub fn set_status(&mut self, status: Status) -> &mut Self {
         self.status = status;
         unsafe {
             let context = self.sp.data as *mut Coroutine<F>;

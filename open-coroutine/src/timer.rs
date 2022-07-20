@@ -20,7 +20,7 @@ fn dur_to_ns(dur: Duration) -> u64 {
         .saturating_add(u64::from(dur.subsec_nanos()))
 }
 
-pub(crate) fn get_timeout_time(dur: Duration) -> u64 {
+pub fn get_timeout_time(dur: Duration) -> u64 {
     let interval = dur_to_ns(dur);
     return now() + interval;
 }

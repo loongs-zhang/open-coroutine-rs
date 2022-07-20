@@ -1,5 +1,3 @@
-pub mod scheduler;
-
 pub mod timer;
 
 pub mod coroutine;

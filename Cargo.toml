@@ -1,20 +1,8 @@
-[package]
-name = "open-coroutine"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-memory-pool = { path = "memory-pool" }
-object-list = { path = "object-list" }
-id-generator = { path = "id-generator" }
-
-[build-dependencies]
-cc = "1.0.73"
-rustversion = "1.0.6"
-
 [workspace]
 members = [
     "memory-pool",
     "object-list",
-    "id-generator"
+    "id-generator",
+    "open-coroutine",
+    "scheduler"
 ]
