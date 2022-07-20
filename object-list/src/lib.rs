@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 use std::os::raw::c_void;
 use std::ptr;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ObjectList {
     inner: VecDeque<*mut c_void>,
 }

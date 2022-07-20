@@ -25,7 +25,7 @@ pub(crate) fn get_timeout_time(dur: Duration) -> u64 {
     return now() + interval;
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TimerEntry {
     time: u64,
     dequeue: ObjectList,
@@ -57,7 +57,7 @@ impl TimerEntry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TimerList {
     dequeue: VecDeque<TimerEntry>,
 }

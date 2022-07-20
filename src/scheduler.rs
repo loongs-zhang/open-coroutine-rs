@@ -9,6 +9,7 @@ use crate::coroutine::{Coroutine, Status};
 use crate::timer;
 use crate::timer::{TimerEntry, TimerList};
 
+#[derive(Debug, PartialEq)]
 pub struct Scheduler {
     ready: ObjectList,
     //正在执行的协程id
@@ -21,8 +22,11 @@ pub struct Scheduler {
     finished: ObjectList,
 }
 
+thread_local! {
+    static SCHEDULER: Box<Scheduler> = Box::new(Scheduler::new());
+}
+
 impl Scheduler {
-    //todo 支持从thread_local中获取Scheduler，没有则创建？
     pub fn new() -> Self {
         Scheduler {
             ready: ObjectList::new(),
@@ -32,6 +36,12 @@ impl Scheduler {
             copy_stack: ObjectList::new(),
             finished: ObjectList::new(),
         }
+    }
+
+    pub fn current<'a>() -> &'a mut Scheduler {
+        SCHEDULER.with(|boxed| {
+            Box::leak(unsafe { ptr::read_unaligned(boxed) })
+        })
     }
 
     pub fn execute(&mut self, mut coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
@@ -239,5 +249,15 @@ mod tests {
             param
         }, None));
         assert_eq!(2, scheduler.schedule().len());
+    }
+
+    #[test]
+    fn current() {
+        let scheduler1 = Scheduler::current();
+        scheduler1.execute(Coroutine::new(2048, |param| {
+            param
+        }, Some(2usize as *mut c_void)));
+        let scheduler2 = Scheduler::current();
+        assert_eq!(scheduler1, scheduler2);
     }
 }
