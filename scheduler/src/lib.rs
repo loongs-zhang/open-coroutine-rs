@@ -3,8 +3,7 @@ use std::ptr;
 use std::time::Duration;
 use object_list::ObjectList;
 use open_coroutine::coroutine::{Coroutine, Status};
-use open_coroutine::timer;
-use open_coroutine::timer::TimerList;
+use timer::TimerList;
 
 //todo 结合线程池，增加global的scheduler，每隔10ms轮循一次
 #[derive(Debug, PartialEq)]

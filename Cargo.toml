@@ -2,6 +2,7 @@
 members = [
     "memory-pool",
     "object-list",
+    "timer",
     "id-generator",
     "open-coroutine",
     "scheduler",

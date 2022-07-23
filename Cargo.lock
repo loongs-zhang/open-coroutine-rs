@@ -131,6 +131,7 @@ dependencies = [
  "memory-pool",
  "object-list",
  "rustversion",
+ "timer",
 ]
 
 [[package]]
@@ -139,6 +140,7 @@ version = "0.1.0"
 dependencies = [
  "object-list",
  "open-coroutine",
+ "timer",
 ]
 
 [[package]]
@@ -158,6 +160,13 @@ name = "system-call"
 version = "0.1.0"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "timer"
+version = "0.1.0"
+dependencies = [
+ "object-list",
 ]
 
 [[package]]

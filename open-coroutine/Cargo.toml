@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 memory-pool = { path = "../memory-pool" }
 object-list = { path = "../object-list" }
+timer={path="../timer"}
 id-generator = { path = "../id-generator" }
 
 [build-dependencies]

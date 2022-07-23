@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 object-list = { path = "../object-list" }
+timer = { path = "../timer" }
 open-coroutine = { path = "../open-coroutine" }

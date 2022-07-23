@@ -13,7 +13,7 @@ pub fn now() -> u64 {
 }
 
 #[inline]
-fn dur_to_ns(dur: Duration) -> u64 {
+pub fn dur_to_ns(dur: Duration) -> u64 {
     // Note that a duration is a (u64, u32) (seconds, nanoseconds) pair
     dur.as_secs()
         .saturating_mul(NANOS_PER_SEC)
@@ -99,12 +99,11 @@ impl TimerList {
 
 #[cfg(test)]
 mod tests {
-    use crate::timer;
-    use crate::timer::TimerList;
+    use crate::{now, TimerList};
 
     #[test]
-    fn now() {
-        println!("{}", timer::now());
+    fn test() {
+        println!("{}", now());
     }
 
     #[test]
