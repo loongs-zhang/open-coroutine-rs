@@ -6,6 +6,7 @@ use open_coroutine::coroutine::{Coroutine, Status};
 use open_coroutine::timer;
 use open_coroutine::timer::TimerList;
 
+//todo 结合线程池，增加global的scheduler，每隔10ms轮循一次
 #[derive(Debug, PartialEq)]
 pub struct Scheduler {
     ready: ObjectList,
@@ -147,6 +148,21 @@ impl Scheduler {
         scheduled
     }
 
+    pub fn schedule_with_timeout(&mut self, timeout: Duration) -> ObjectList {
+        let timeout_time = timer::get_timeout_time(timeout);
+        let mut scheduled = ObjectList::new();
+        while self.suspend.len() > 0 || self.ready.len() > 0 {
+            if timeout_time <= timer::now() {
+                break;
+            }
+            let mut temp = self.try_schedule();
+            while !temp.is_empty() {
+                scheduled.push_back_raw(temp.pop_front_raw().unwrap());
+            }
+        }
+        scheduled
+    }
+
     pub fn get_finished(&self) -> &ObjectList {
         &self.finished
     }
@@ -245,6 +261,15 @@ mod tests {
             param
         }, None));
         assert_eq!(2, scheduler.schedule().len());
+    }
+
+    #[test]
+    fn schedule_with_timeout() {
+        let mut scheduler = Scheduler::new();
+        scheduler.delay(Duration::from_millis(500), Coroutine::new(2048, |param| {
+            param
+        }, None));
+        assert_eq!(0, scheduler.schedule_with_timeout(Duration::from_millis(10)).len());
     }
 
     #[test]
