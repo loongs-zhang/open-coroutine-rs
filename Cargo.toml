@@ -4,5 +4,7 @@ members = [
     "object-list",
     "id-generator",
     "open-coroutine",
-    "scheduler"
+    "scheduler",
+    "system-call",
+    "libcx"
 ]

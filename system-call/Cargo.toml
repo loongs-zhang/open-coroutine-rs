@@ -1,0 +1,12 @@
+[package]
+name = "system-call"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libc = "0.2.119"
+
+[lib]
+crate-type = ["cdylib"]
+name = "hook"
+path = "src/lib.rs"
