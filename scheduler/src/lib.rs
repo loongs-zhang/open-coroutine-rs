@@ -120,6 +120,7 @@ impl Scheduler {
                         let mut coroutine = ptr::read_unaligned(pointer as
                             *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>);
                         self.running = Some(coroutine.get_id());
+                        //todo 不回跳，直接执行下一个协程，需要解决丢数据的问题
                         let result = coroutine.resume();
                         self.running = None;
                         //移动至"已完成"队列
@@ -136,6 +137,7 @@ impl Scheduler {
         }
     }
 
+    //todo 提供一个block版，如果suspend和ready没有，则把自己挂起
     pub fn schedule(&mut self) -> ObjectList {
         let mut scheduled = ObjectList::new();
         while self.suspend.len() > 0 || self.ready.len() > 0 {
