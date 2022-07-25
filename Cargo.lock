@@ -138,6 +138,7 @@ dependencies = [
 name = "open-coroutine-scheduler"
 version = "0.1.0"
 dependencies = [
+ "lazy_static",
  "object-list",
  "open-coroutine",
  "timer",

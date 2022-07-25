@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate lazy_static;
+
 use std::os::raw::c_void;
 use std::ptr;
 use std::time::Duration;
@@ -19,9 +22,17 @@ pub struct Scheduler {
     finished: ObjectList,
 }
 
+lazy_static! {
+    static ref GLOBAL: Box<Scheduler> = Box::new(Scheduler::new());
+}
+
 thread_local! {
     static SCHEDULER: Box<Scheduler> = Box::new(Scheduler::new());
 }
+
+unsafe impl Send for Scheduler {}
+
+unsafe impl Sync for Scheduler {}
 
 impl Scheduler {
     pub fn new() -> Self {
@@ -33,6 +44,11 @@ impl Scheduler {
             copy_stack: ObjectList::new(),
             finished: ObjectList::new(),
         }
+    }
+
+    pub fn global<'a>() -> &'a mut Scheduler {
+        let boxed: &Box<Scheduler> = &GLOBAL;
+        Box::leak(unsafe { ptr::read_unaligned(boxed) })
     }
 
     pub fn current<'a>() -> &'a mut Scheduler {
@@ -271,6 +287,16 @@ mod tests {
             param
         }, None));
         assert_eq!(0, scheduler.schedule_with_timeout(Duration::from_millis(10)).len());
+    }
+
+    #[test]
+    fn global() {
+        let mut scheduler1 = Scheduler::global();
+        scheduler1.execute(Coroutine::new(2048, |param| {
+            param
+        }, Some(2usize as *mut c_void)));
+        let scheduler2 = Scheduler::global();
+        assert_eq!(scheduler1, scheduler2);
     }
 
     #[test]
