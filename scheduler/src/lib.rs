@@ -8,7 +8,6 @@ use object_list::ObjectList;
 use open_coroutine::coroutine::{Coroutine, Status};
 use timer::TimerList;
 
-//todo 结合线程池，增加global的scheduler，每隔10ms轮循一次
 #[derive(Debug, PartialEq)]
 pub struct Scheduler {
     ready: ObjectList,
@@ -143,7 +142,6 @@ impl Scheduler {
                         scheduled.push_back(ptr::read_unaligned(&result));
                         self.finished.push_back(result);
                         coroutine.exit();
-                        //fixme 修复内存泄漏问题
                         std::mem::forget(coroutine);
                     }
                     None => {}
@@ -165,7 +163,7 @@ impl Scheduler {
         scheduled
     }
 
-    pub fn schedule_with_timeout(&mut self, timeout: Duration) -> ObjectList {
+    pub fn timed_schedule(&mut self, timeout: Duration) -> ObjectList {
         let timeout_time = timer::get_timeout_time(timeout);
         let mut scheduled = ObjectList::new();
         while self.suspend.len() > 0 || self.ready.len() > 0 {
@@ -286,7 +284,7 @@ mod tests {
         scheduler.delay(Duration::from_millis(500), Coroutine::new(2048, |param| {
             param
         }, None));
-        assert_eq!(0, scheduler.schedule_with_timeout(Duration::from_millis(10)).len());
+        assert_eq!(0, scheduler.timed_schedule(Duration::from_millis(10)).len());
     }
 
     #[test]
