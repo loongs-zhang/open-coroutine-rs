@@ -178,6 +178,10 @@ impl Scheduler {
         scheduled
     }
 
+    pub fn get_ready(&self) -> &ObjectList {
+        &self.ready
+    }
+
     pub fn get_finished(&self) -> &ObjectList {
         &self.finished
     }
@@ -294,7 +298,7 @@ mod tests {
             param
         }, Some(2usize as *mut c_void)));
         let scheduler2 = Scheduler::global();
-        assert_eq!(scheduler1, scheduler2);
+        assert_eq!(scheduler1.get_ready().len(), scheduler2.get_ready().len());
     }
 
     #[test]

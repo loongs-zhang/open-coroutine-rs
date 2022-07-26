@@ -7,3 +7,7 @@ edition = "2021"
 # 添加libc的依赖后，就不需要再重复地一个个声明系统函数了
 libc = "0.2.119"
 system-call = { path = "../system-call" }
+
+[dev-dependencies]
+open-coroutine = { path = "../open-coroutine" }
+open-coroutine-scheduler = { path = "../scheduler" }
