@@ -1,9 +1,8 @@
-#[macro_use]
-extern crate lazy_static;
-
+use std::mem::ManuallyDrop;
 use std::os::raw::c_void;
 use std::ptr;
 use std::time::Duration;
+use once_cell::sync::Lazy;
 use object_list::ObjectList;
 use open_coroutine::coroutine::{Coroutine, Status};
 use timer::TimerList;
@@ -21,9 +20,10 @@ pub struct Scheduler {
     finished: ObjectList,
 }
 
-lazy_static! {
-    static ref GLOBAL: Box<Scheduler> = Box::new(Scheduler::new());
-}
+//fixme 在hook的情况下，会初始化2次，需要在第1次初始化后放到c的内存里
+static mut GLOBAL: Lazy<ManuallyDrop<Scheduler>> = Lazy::new(|| {
+    ManuallyDrop::new(Scheduler::new())
+});
 
 thread_local! {
     static SCHEDULER: Box<Scheduler> = Box::new(Scheduler::new());
@@ -45,9 +45,8 @@ impl Scheduler {
         }
     }
 
-    pub fn global<'a>() -> &'a mut Scheduler {
-        let boxed: &Box<Scheduler> = &GLOBAL;
-        Box::leak(unsafe { ptr::read_unaligned(boxed) })
+    pub fn global() -> &'static mut ManuallyDrop<Scheduler> {
+        unsafe { &mut GLOBAL }
     }
 
     pub fn current<'a>() -> &'a mut Scheduler {
@@ -298,7 +297,7 @@ mod tests {
             param
         }, Some(2usize as *mut c_void)));
         let scheduler2 = Scheduler::global();
-        assert_eq!(scheduler1.get_ready().len(), scheduler2.get_ready().len());
+        assert_eq!(scheduler1, scheduler2);
     }
 
     #[test]

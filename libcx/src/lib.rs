@@ -10,7 +10,8 @@ mod tests {
             println!("test_sleep execute when sleep");
             param
         }, None));
-        println!("test_sleep ready {}",Scheduler::global().get_ready().len());
+        let x = Scheduler::global();
+        println!("test_sleep ready {}", Scheduler::global().get_ready().len());
         unsafe {
             libc::sleep(1);
         }

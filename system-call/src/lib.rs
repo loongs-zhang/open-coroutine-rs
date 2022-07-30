@@ -8,7 +8,8 @@ use open_coroutine_scheduler::Scheduler;
 #[no_mangle]
 pub extern "C" fn sleep(i: c_uint) -> c_uint {
     println!("hooked sleep {}", i);
-    println!("sleep ready {}",Scheduler::global().get_ready().len());
+    let x = Scheduler::global();
+    println!("sleep ready {}", Scheduler::global().get_ready().len());
     Scheduler::global().execute(Coroutine::new(2048, |param| {
         println!("sleep execute when sleep");
         param
