@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::mem::ManuallyDrop;
 use std::os::raw::c_void;
 use std::ptr;
@@ -22,7 +24,30 @@ pub struct Scheduler {
 
 //fixme 在hook的情况下，会初始化2次，需要在第1次初始化后放到c的内存里
 static mut GLOBAL: Lazy<ManuallyDrop<Scheduler>> = Lazy::new(|| {
-    ManuallyDrop::new(Scheduler::new())
+    let path = "/Users/admin/Desktop/global.txt";
+    let global = File::open(path);
+    match global {
+        Ok(file) => {
+            let mut string = String::new();
+            let mut reader = BufReader::new(file);
+            reader.read_to_string(&mut string);
+            unsafe {
+                let pointer = string.parse::<usize>().unwrap()
+                    as *mut c_void as *mut ManuallyDrop<Scheduler>;
+                let scheduler= ptr::read_unaligned(pointer);
+                //fixme 这里read出的内存不可用
+                scheduler
+            }
+        }
+        Err(_) => {
+            let mut scheduler = ManuallyDrop::new(Scheduler::new());
+            let pointer = &mut scheduler as *mut _ as usize;
+            let mut writer = BufWriter::new(File::create(path).unwrap());
+            writer.write(pointer.to_string().as_bytes());
+            writer.flush();
+            scheduler
+        }
+    }
 });
 
 thread_local! {
