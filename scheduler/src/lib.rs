@@ -108,7 +108,6 @@ impl Scheduler {
                     None => {}
                 }
             }
-            //过滤未到执行时间的协程
             for _ in 0..self.ready.len() {
                 match self.ready.pop_front_raw() {
                     Some(mut pointer) => {
@@ -116,6 +115,7 @@ impl Scheduler {
                             *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>);
                         //fixme 这里拿到的时间不对
                         let exec_time = coroutine.get_execute_time();
+                        //过滤未到执行时间的协程
                         if timer::now() < exec_time {
                             //设置协程状态
                             coroutine.set_status(Status::Suspend);
@@ -123,17 +123,6 @@ impl Scheduler {
                             self.suspend.insert(exec_time, coroutine);
                             continue;
                         }
-                        self.ready.push_back_raw(pointer);
-                        std::mem::forget(coroutine);
-                    }
-                    None => {}
-                }
-            }
-            for _ in 0..self.ready.len() {
-                match self.ready.pop_front_raw() {
-                    Some(mut pointer) => {
-                        let mut coroutine = ptr::read_unaligned(pointer as
-                            *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>);
                         self.running = Some(coroutine.get_id());
                         //todo 不回跳，直接执行下一个协程，需要解决丢数据的问题
                         let result = coroutine.resume();
@@ -201,7 +190,7 @@ mod tests {
         let y = 2;
         let mut scheduler = Scheduler::new();
         scheduler.execute(Coroutine::new(2048, |param| {
-            println!("\nenv {}", x);
+            print!("env {} ", x);
             match param {
                 Some(param) => {
                     println!("coroutine1 {}", param as usize);
@@ -213,7 +202,7 @@ mod tests {
             param
         }, Some(1usize as *mut c_void)));
         scheduler.execute(Coroutine::new(2048, |param| {
-            println!("\nenv {}", y);
+            print!("env {} ", y);
             match param {
                 Some(param) => {
                     println!("coroutine2 {}", param as usize);
@@ -280,6 +269,28 @@ mod tests {
             param
         }, None));
         assert_eq!(2, scheduler.schedule().len());
+    }
+
+    #[test]
+    fn delay() {
+        let mut scheduler = Scheduler::new();
+        let mut coroutine = Coroutine::new(2048, |param| {
+            println!("coroutine1");
+            param
+        }, None);
+        coroutine.set_delay(Duration::from_millis(500));
+        scheduler.execute(coroutine);
+        assert_eq!(0, scheduler.try_schedule().len());
+    }
+
+    #[test]
+    fn try_schedule() {
+        let mut scheduler = Scheduler::new();
+        scheduler.delay(Duration::from_millis(500), Coroutine::new(2048, |param| {
+            println!("coroutine1");
+            param
+        }, None));
+        assert_eq!(0, scheduler.try_schedule().len());
     }
 
     #[test]
