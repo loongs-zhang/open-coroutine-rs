@@ -5,12 +5,22 @@ use std::os::raw::c_void;
 use std::ptr;
 use std::time::Duration;
 use once_cell::sync::Lazy;
+use id_generator::IdGenerator;
 use object_list::ObjectList;
 use open_coroutine::coroutine::{Coroutine, Status};
 use timer::TimerList;
 
-#[derive(Debug, PartialEq)]
+static mut GLOBAL: Lazy<ManuallyDrop<Scheduler>> = Lazy::new(|| {
+    ManuallyDrop::new(Scheduler::new())
+});
+
+thread_local! {
+    static SCHEDULER: Box<Scheduler> = Box::new(Scheduler::new());
+}
+
+#[derive(Debug)]
 pub struct Scheduler {
+    id: usize,
     ready: ObjectList,
     //正在执行的协程id
     running: Option<usize>,
@@ -22,12 +32,10 @@ pub struct Scheduler {
     finished: ObjectList,
 }
 
-static mut GLOBAL: Lazy<ManuallyDrop<Scheduler>> = Lazy::new(|| {
-    ManuallyDrop::new(Scheduler::new())
-});
-
-thread_local! {
-    static SCHEDULER: Box<Scheduler> = Box::new(Scheduler::new());
+impl PartialEq for Scheduler {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
 }
 
 unsafe impl Send for Scheduler {}
@@ -37,6 +45,7 @@ unsafe impl Sync for Scheduler {}
 impl Scheduler {
     pub fn new() -> Self {
         Scheduler {
+            id: IdGenerator::next_id("scheduler"),
             ready: ObjectList::new(),
             running: None,
             suspend: TimerList::new(),

@@ -124,6 +124,7 @@ dependencies = [
 name = "open-coroutine-scheduler"
 version = "0.1.0"
 dependencies = [
+ "id-generator",
  "object-list",
  "once_cell",
  "open-coroutine",

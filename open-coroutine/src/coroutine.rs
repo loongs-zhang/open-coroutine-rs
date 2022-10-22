@@ -102,8 +102,8 @@ impl<F> Coroutine<F>
     pub fn new(size: usize, proc: F, param: Option<*mut c_void>) -> Self {
         let stack = memory_pool::allocate(size)
             .expect("allocate stack failed !");
-        Coroutine::init(IdGenerator::next_id(), stack, Status::Created,
-                        Box::new(proc), param, None)
+        Coroutine::init(IdGenerator::next_id("coroutine"), stack,
+                        Status::Created, Box::new(proc), param, None)
     }
 
     fn init(id: usize, stack: ManuallyDrop<Memory>,
