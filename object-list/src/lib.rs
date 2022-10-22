@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
 use std::os::raw::c_void;
 use std::ptr;
+use crossbeam_deque::{Stealer, Worker};
 
 #[derive(Debug, PartialEq)]
 pub struct ObjectList {
@@ -186,9 +187,63 @@ impl AsMut<ObjectList> for ObjectList {
     }
 }
 
+#[derive(Debug)]
+pub struct StealableObjectList {
+    inner: Worker<*mut c_void>,
+}
+
+impl StealableObjectList {
+    pub fn new() -> Self {
+        StealableObjectList { inner: Worker::new_fifo() }
+    }
+
+    pub fn push_back<T>(&mut self, element: T) {
+        let ptr = Box::leak(Box::new(element));
+        self.inner.push(ptr as *mut _ as *mut c_void);
+    }
+
+    pub fn pop_front<T>(&mut self) -> Option<T> {
+        match self.inner.pop() {
+            Some(pointer) => {
+                convert(pointer)
+            }
+            None => None
+        }
+    }
+
+    /// 如果是闭包，还是要获取裸指针再手动转换，不然类型有问题
+    pub fn pop_front_raw(&mut self) -> Option<*mut c_void> {
+        self.inner.pop()
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    pub fn stealer_raw(&self) -> Stealer<*mut c_void> {
+        self.inner.stealer()
+    }
+}
+
+impl AsRef<StealableObjectList> for StealableObjectList {
+    fn as_ref(&self) -> &StealableObjectList {
+        &*self
+    }
+}
+
+impl AsMut<StealableObjectList> for StealableObjectList {
+    fn as_mut(&mut self) -> &mut StealableObjectList {
+        &mut *self
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::ObjectList;
+    use crate::{ObjectList, StealableObjectList};
 
     #[test]
     fn test() {
@@ -211,5 +266,20 @@ mod tests {
         assert_eq!(true, b);
         let n: i32 = list.pop_back().unwrap();
         assert_eq!(1, n);
+    }
+
+    #[test]
+    fn test_stealable() {
+        let mut list = StealableObjectList::new();
+        assert!(list.is_empty());
+        list.push_back(1);
+        assert!(!list.is_empty());
+        list.push_back(true);
+        assert_eq!(2, list.len());
+
+        let n: i32 = list.pop_front().unwrap();
+        assert_eq!(1, n);
+        let b: bool = list.pop_front().unwrap();
+        assert_eq!(true, b);
     }
 }

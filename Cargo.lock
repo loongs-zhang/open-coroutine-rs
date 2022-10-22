@@ -101,6 +101,9 @@ dependencies = [
 [[package]]
 name = "object-list"
 version = "0.1.0"
+dependencies = [
+ "crossbeam-deque",
+]
 
 [[package]]
 name = "once_cell"

@@ -7,6 +7,7 @@ use std::time::Duration;
 use once_cell::sync::Lazy;
 use id_generator::IdGenerator;
 use object_list::ObjectList;
+use object_list::StealableObjectList;
 use open_coroutine::coroutine::{Coroutine, Status};
 use timer::TimerList;
 
@@ -21,7 +22,7 @@ thread_local! {
 #[derive(Debug)]
 pub struct Scheduler {
     id: usize,
-    ready: ObjectList,
+    ready: StealableObjectList,
     //正在执行的协程id
     running: Option<usize>,
     suspend: TimerList,
@@ -46,7 +47,7 @@ impl Scheduler {
     pub fn new() -> Self {
         Scheduler {
             id: IdGenerator::next_id("scheduler"),
-            ready: ObjectList::new(),
+            ready: StealableObjectList::new(),
             running: None,
             suspend: TimerList::new(),
             system_call: ObjectList::new(),
@@ -176,7 +177,7 @@ impl Scheduler {
         scheduled
     }
 
-    pub fn get_ready(&self) -> &ObjectList {
+    pub fn get_ready(&self) -> &StealableObjectList {
         &self.ready
     }
 
