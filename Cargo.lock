@@ -85,16 +85,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb691a747a7ab48abc15c5b42066eaafde10dc427e3b6ee2a1cf43db04c763bd"
 
 [[package]]
-name = "libcx"
-version = "0.1.0"
-dependencies = [
- "libc",
- "open-coroutine",
- "open-coroutine-scheduler",
- "system-call",
-]
-
-[[package]]
 name = "memoffset"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -157,15 +147,6 @@ name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
-
-[[package]]
-name = "system-call"
-version = "0.1.0"
-dependencies = [
- "libc",
- "open-coroutine",
- "open-coroutine-scheduler",
-]
 
 [[package]]
 name = "timer"
