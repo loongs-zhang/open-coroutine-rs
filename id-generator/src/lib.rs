@@ -1,17 +1,15 @@
-#[macro_use]
-extern crate lazy_static;
-
 use std::sync::atomic::{AtomicUsize, Ordering};
+use once_cell::sync::Lazy;
 
 pub struct IdGenerator {}
 
-lazy_static! {
-    static ref ID: AtomicUsize = AtomicUsize::new(1);
-}
+static mut ID: Lazy<AtomicUsize> = Lazy::new(|| {
+    AtomicUsize::new(1)
+});
 
 impl IdGenerator {
     pub fn next_id() -> usize {
-        ID.fetch_add(1, Ordering::SeqCst)
+        unsafe { ID.fetch_add(1, Ordering::SeqCst) }
     }
 }
 
