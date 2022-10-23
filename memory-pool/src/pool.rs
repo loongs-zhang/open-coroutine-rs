@@ -1,7 +1,5 @@
 use std::collections::VecDeque;
 use std::mem::ManuallyDrop;
-use std::ops::{Deref, DerefMut};
-use std::ptr;
 use crossbeam_deque::Worker;
 use crate::memory::{Memory, MemoryError};
 use crate::system;
@@ -37,10 +35,8 @@ impl SizedMemoryPool {
         }
         match self.available.pop() {
             Some(available) => {
-                unsafe {
-                    self.using.push_back(available);
-                    Ok(available)
-                }
+                self.using.push_back(available);
+                Ok(available)
             }
             None => self.allocate()
         }
@@ -90,7 +86,7 @@ impl Default for SizedMemoryPool {
 #[cfg(test)]
 mod tests {
     use std::ptr;
-    use crate::{pool, system};
+    use crate::system;
     use crate::pool::SizedMemoryPool;
 
     #[test]

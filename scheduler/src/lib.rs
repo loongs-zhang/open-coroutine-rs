@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write};
 use std::mem::ManuallyDrop;
 use std::os::raw::c_void;
 use std::ptr;
@@ -27,8 +25,10 @@ pub struct Scheduler {
     running: Option<usize>,
     suspend: TimerList,
     //not support for now
+    #[allow(unused)]
     system_call: ObjectList,
     //not support for now
+    #[allow(unused)]
     copy_stack: ObjectList,
     finished: ObjectList,
 }
@@ -76,7 +76,7 @@ impl Scheduler {
         self.ready.push_back(coroutine);
     }
 
-    pub fn delay(&mut self, delay: Duration, mut coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
+    pub fn delay(&mut self, delay: Duration, coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
         let time = timer::get_timeout_time(delay);
         self.execute_at(time, coroutine)
     }
@@ -120,7 +120,7 @@ impl Scheduler {
             }
             for _ in 0..self.ready.len() {
                 match self.ready.pop_front_raw() {
-                    Some(mut pointer) => {
+                    Some(pointer) => {
                         let mut coroutine = ptr::read_unaligned(pointer as
                             *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>);
                         //fixme 这里拿到的时间不对
@@ -229,7 +229,7 @@ mod tests {
     #[test]
     fn test() {
         let mut scheduler = Scheduler::new();
-        let mut coroutine = Coroutine::new(2048, |param| {
+        let coroutine = Coroutine::new(2048, |param| {
             match param {
                 Some(param) => {
                     println!("user_function1 {}", param as usize);
@@ -314,7 +314,7 @@ mod tests {
 
     #[test]
     fn global() {
-        let mut scheduler1 = Scheduler::global();
+        let scheduler1 = Scheduler::global();
         scheduler1.execute(Coroutine::new(2048, |param| {
             param
         }, Some(2usize as *mut c_void)));

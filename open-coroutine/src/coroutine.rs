@@ -1,11 +1,9 @@
 use std::os::raw::c_void;
 use std::{ptr, thread};
 use std::mem::ManuallyDrop;
-use std::ptr::NonNull;
 use std::time::Duration;
 use id_generator::IdGenerator;
 use memory_pool::memory::Memory;
-use object_list::ObjectList;
 use crate::context::{Context, Transfer};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -111,7 +109,7 @@ impl<F> Coroutine<F>
             next: Option<*mut c_void>) -> Self {
         let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
         // Allocate a Context on the stack.
-        let mut sp = Transfer::new(inner, 0 as *mut c_void);
+        let sp = Transfer::new(inner, 0 as *mut c_void);
         let mut context = Coroutine {
             id,
             stack,
@@ -131,7 +129,7 @@ impl<F> Coroutine<F>
 
     fn invoke(&mut self) -> Option<*mut c_void> {
         unsafe {
-            let mut func = ptr::read_unaligned(self.proc.as_ref());
+            let func = ptr::read_unaligned(self.proc.as_ref());
             let result = func(self.param);
             self.set_result(result);
             self.set_status(Status::Finished);
@@ -158,7 +156,7 @@ impl<F: ?Sized> Coroutine<F> {
     }
 
     fn switch(&self, to: &Transfer) -> Self {
-        let mut sp = Transfer::switch(to);
+        let sp = Transfer::switch(to);
         let context = sp.data as *mut Coroutine<F>;
         unsafe { ptr::read_unaligned(context) }
     }
@@ -278,6 +276,7 @@ impl<F: ?Sized> Coroutine<F> {
         unsafe { (*context).entrance }
     }
 
+    #[allow(unused)]
     pub(crate) fn set_entrance(&mut self, entrance: &Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void> + ?Sized>) -> &mut Self {
         unsafe {
             let mut entrance = ptr::read_unaligned(entrance.sp.context.0);
@@ -293,7 +292,6 @@ impl<F: ?Sized> Coroutine<F> {
 #[cfg(test)]
 mod tests {
     use std::os::raw::c_void;
-    use std::ptr;
     use std::time::Duration;
     use crate::coroutine::Coroutine;
 

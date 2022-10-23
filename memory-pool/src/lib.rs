@@ -90,8 +90,7 @@ pub fn default() -> Result<ManuallyDrop<Memory>, MemoryError> {
 #[cfg(test)]
 mod tests {
     use crate::{allocate, get_memory_pool, MEMORY_POOL, revert};
-    use crate::{pool, system};
-    use crate::pool::SizedMemoryPool;
+    use crate::system;
 
     #[test]
     fn test_memory_pool() {

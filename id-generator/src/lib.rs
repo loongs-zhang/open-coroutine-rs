@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::RwLock;
 use once_cell::sync::Lazy;

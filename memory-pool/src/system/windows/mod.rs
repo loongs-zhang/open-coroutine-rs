@@ -79,6 +79,6 @@ pub fn min_size() -> usize {
 }
 
 // Windows does not seem to provide a stack limit API
-pub fn max_size(protected: bool) -> usize {
+pub fn max_size(_: bool) -> usize {
     usize::MAX
 }

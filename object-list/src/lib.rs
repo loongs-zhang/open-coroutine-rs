@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::ops::{Deref, DerefMut};
 use std::os::raw::c_void;
 use std::ptr;
 use crossbeam_deque::{Stealer, Worker};
@@ -37,7 +36,7 @@ impl ObjectList {
         match self.inner.front_mut() {
             Some(value) => {
                 unsafe {
-                    let mut result = ptr::read_unaligned(value) as *mut T;
+                    let result = ptr::read_unaligned(value) as *mut T;
                     Some(&mut *result)
                 }
             }
@@ -93,7 +92,7 @@ impl ObjectList {
         match self.inner.back_mut() {
             Some(value) => {
                 unsafe {
-                    let mut result = ptr::read_unaligned(value) as *mut T;
+                    let result = ptr::read_unaligned(value) as *mut T;
                     Some(&mut *result)
                 }
             }

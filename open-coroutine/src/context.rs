@@ -2,7 +2,6 @@ use core::fmt;
 use std::fmt::{Debug, Formatter};
 use std::mem::ManuallyDrop;
 use std::os::raw::c_void;
-use std::ptr::NonNull;
 use memory_pool::memory::Memory;
 
 /// A `Context` stores a `ContextFn`'s state of execution, for it to be resumed later.
@@ -109,7 +108,7 @@ extern "C" {
     /// * `size` - The size of the stack.
     /// * `f`    - A function to be invoked on the first call to jump_fcontext(this, _).
     #[inline(never)]
-    #[warn(unused_attributes)]
+    #[allow(unused)]
     fn make_fcontext(sp: *mut c_void, size: usize, f: ContextFn) -> &'static c_void;
 
     /// Yields the execution to another `Context`.
@@ -119,7 +118,7 @@ extern "C" {
     /// * `param`  - An arbitrary argument that will be set as the `data` field
     ///          of the `Transfer` object passed to the other Context.
     #[inline(never)]
-    #[warn(unused_attributes)]
+    #[allow(unused)]
     fn jump_fcontext(to: &'static c_void, param: *mut c_void) -> Transfer;
 }
 
@@ -127,7 +126,6 @@ extern "C" {
 mod tests {
     use std::mem::ManuallyDrop;
     use std::os::raw::c_void;
-    use std::ptr::NonNull;
     use memory_pool::memory::Memory;
     use crate::context::{Context, Transfer};
 
@@ -153,7 +151,7 @@ mod tests {
     fn test() {
         println!("inner context test started !");
         // Allocate some stack.
-        let mut stack = Memory::default();
+        let stack = Memory::default();
 
         let context = Context::new(ManuallyDrop::new(stack), context_function);
         // Allocate a Context on the stack.

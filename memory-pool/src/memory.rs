@@ -8,9 +8,7 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io;
-use std::ops::Deref;
 use std::os::raw::c_void;
-use std::ptr::NonNull;
 
 use crate::system;
 
@@ -39,7 +37,10 @@ impl Error for MemoryError {
     fn description(&self) -> &str {
         match *self {
             MemoryError::ExceedsMaximumSize(_) => "exceeds maximum stack size",
-            MemoryError::IoError(ref e) => e.description(),
+            MemoryError::IoError(ref e) => {
+                #[allow(deprecated)]
+                e.description()
+            }
         }
     }
     fn cause(&self) -> Option<&dyn Error> {
@@ -205,7 +206,7 @@ mod tests {
     fn stack_size_too_large() {
         let stack_size = system::max_size(true);
         match Memory::new(stack_size) {
-            Err(MemoryError::ExceedsMaximumSize(size)) => panic!(),
+            Err(MemoryError::ExceedsMaximumSize(_)) => panic!(),
             _ => {}
         }
 
