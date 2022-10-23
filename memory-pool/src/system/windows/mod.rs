@@ -14,7 +14,6 @@ use std::usize;
 use kernel32;
 use winapi;
 
-use stack::Stack;
 use crate::memory::Memory;
 
 pub unsafe fn allocate(size: usize) -> io::Result<Memory> {
