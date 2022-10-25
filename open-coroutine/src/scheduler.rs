@@ -6,8 +6,8 @@ use once_cell::sync::Lazy;
 use id_generator::IdGenerator;
 use object_list::ObjectList;
 use object_list::StealableObjectList;
-use open_coroutine::coroutine::{Coroutine, Status};
 use timer::TimerList;
+use crate::coroutine::{Coroutine, Status};
 
 static mut GLOBAL: Lazy<ManuallyDrop<Scheduler>> = Lazy::new(|| {
     ManuallyDrop::new(Scheduler::new())
@@ -88,65 +88,75 @@ impl Scheduler {
     }
 
     pub fn try_schedule(&mut self) -> ObjectList {
+        self.check_ready();
+        self.do_schedule()
+    }
+
+    fn do_schedule(&mut self) -> ObjectList {
         let mut scheduled = ObjectList::new();
-        unsafe {
-            for _ in 0..self.suspend.len() {
-                match self.suspend.front() {
-                    Some(entry) => {
-                        let exec_time = entry.get_time();
-                        if timer::now() < exec_time {
-                            break;
-                        }
-                        //移动至"就绪"队列
-                        match self.suspend.pop_front() {
-                            Some(mut entry) => {
-                                for _ in 0..entry.len() {
-                                    match entry.pop_front_raw() {
-                                        Some(pointer) => {
+        for _ in 0..self.ready.len() {
+            match self.ready.pop_front_raw() {
+                Some(pointer) => {
+                    let mut coroutine = unsafe {
+                        ptr::read_unaligned(pointer as
+                            *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
+                    };
+                    //fixme 这里拿到的时间不对
+                    let exec_time = coroutine.get_execute_time();
+                    //过滤未到执行时间的协程
+                    if timer::now() < exec_time {
+                        //设置协程状态
+                        coroutine.set_status(Status::Suspend);
+                        //移动至"挂起"队列
+                        self.suspend.insert(exec_time, coroutine);
+                        continue;
+                    }
+                    self.running = Some(coroutine.get_id());
+                    coroutine.set_scheduler(self);
+                    let result = coroutine.resume();
+                    self.running = None;
+                    //移动至"已完成"队列
+                    scheduled.push_back(unsafe { ptr::read_unaligned(&result) });
+                    self.finished.push_back(result);
+                    coroutine.exit();
+                    std::mem::forget(coroutine);
+                }
+                None => {}
+            }
+        }
+        scheduled
+    }
+
+    fn check_ready(&mut self) {
+        for _ in 0..self.suspend.len() {
+            match self.suspend.front() {
+                Some(entry) => {
+                    let exec_time = entry.get_time();
+                    if timer::now() < exec_time {
+                        break;
+                    }
+                    //移动至"就绪"队列
+                    match self.suspend.pop_front() {
+                        Some(mut entry) => {
+                            for _ in 0..entry.len() {
+                                match entry.pop_front_raw() {
+                                    Some(pointer) => {
+                                        unsafe {
                                             let mut coroutine = ptr::read_unaligned(pointer as
                                                 *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>);
                                             coroutine.set_status(Status::Ready);
                                             self.ready.push_back(coroutine)
                                         }
-                                        None => {}
                                     }
+                                    None => {}
                                 }
                             }
-                            None => {}
                         }
+                        None => {}
                     }
-                    None => {}
                 }
+                None => {}
             }
-            for _ in 0..self.ready.len() {
-                match self.ready.pop_front_raw() {
-                    Some(pointer) => {
-                        let mut coroutine = ptr::read_unaligned(pointer as
-                            *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>);
-                        //fixme 这里拿到的时间不对
-                        let exec_time = coroutine.get_execute_time();
-                        //过滤未到执行时间的协程
-                        if timer::now() < exec_time {
-                            //设置协程状态
-                            coroutine.set_status(Status::Suspend);
-                            //移动至"挂起"队列
-                            self.suspend.insert(exec_time, coroutine);
-                            continue;
-                        }
-                        self.running = Some(coroutine.get_id());
-                        //todo 不回跳，直接执行下一个协程，需要解决丢数据的问题
-                        let result = coroutine.resume();
-                        self.running = None;
-                        //移动至"已完成"队列
-                        scheduled.push_back(ptr::read_unaligned(&result));
-                        self.finished.push_back(result);
-                        coroutine.exit();
-                        std::mem::forget(coroutine);
-                    }
-                    None => {}
-                }
-            }
-            scheduled
         }
     }
 
@@ -191,8 +201,8 @@ mod tests {
     use std::os::raw::c_void;
     use std::thread;
     use std::time::Duration;
-    use open_coroutine::coroutine::Coroutine;
-    use crate::Scheduler;
+    use crate::coroutine::Coroutine;
+    use crate::scheduler::Scheduler;
 
     #[test]
     fn simple() {

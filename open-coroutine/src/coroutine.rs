@@ -5,6 +5,7 @@ use std::time::Duration;
 use id_generator::IdGenerator;
 use memory_pool::memory::Memory;
 use crate::context::{Context, Transfer};
+use crate::scheduler::Scheduler;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Status {
@@ -44,6 +45,7 @@ pub struct Coroutine<F: ?Sized> {
     next: Option<*mut c_void>,
     //入口协程，也是出口
     entrance: Option<*mut c_void>,
+    scheduler: Option<*mut Scheduler>,
 }
 
 impl<F> Coroutine<F>
@@ -55,7 +57,7 @@ impl<F> Coroutine<F>
                 let context = t.data as *mut Coroutine<F>;
                 if timer::now() < (*context).exec_time {
                     //让出CPU的执行权
-                    thread::yield_now();
+                    (*context).run_next_coroutine();
                     continue;
                 }
                 //设置协程状态为运行中
@@ -80,7 +82,7 @@ impl<F> Coroutine<F>
                                 t = t.resume(pointer);
                             }
                             None => {
-                                //如果没有，也能跑，性能差一些
+                                (*context).run_next_coroutine();
                             }
                         }
                     }
@@ -122,6 +124,7 @@ impl<F> Coroutine<F>
             exec_time: 0,
             next,
             entrance: None,
+            scheduler: None,
         };
         context.sp.data = &mut context as *mut Coroutine<F> as *mut c_void;
         context
@@ -134,6 +137,18 @@ impl<F> Coroutine<F>
             self.set_result(result);
             self.set_status(Status::Finished);
             result
+        }
+    }
+
+    /// 不回跳，直接执行下一个协程
+    fn run_next_coroutine(&mut self) {
+        match self.scheduler {
+            Some(mut scheduler) => {
+                unsafe { (*scheduler).try_schedule(); }
+            }
+            None => {
+                //如果没有，也能跑，性能差一些
+            }
         }
     }
 }
@@ -284,6 +299,16 @@ impl<F: ?Sized> Coroutine<F> {
             self.entrance = Some(pointer);
             let context = self.sp.data as *mut Coroutine<F>;
             (*context).entrance = Some(pointer);
+        }
+        self
+    }
+
+    #[allow(unused)]
+    pub(crate) fn set_scheduler(&mut self, scheduler: &mut Scheduler) -> &mut Self {
+        unsafe {
+            self.scheduler = Some(scheduler as *mut Scheduler);
+            let context = self.sp.data as *mut Coroutine<F>;
+            (*context).scheduler = Some(scheduler as *mut Scheduler);
         }
         self
     }

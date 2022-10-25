@@ -119,18 +119,8 @@ dependencies = [
  "id-generator",
  "memory-pool",
  "object-list",
- "rustversion",
- "timer",
-]
-
-[[package]]
-name = "open-coroutine-scheduler"
-version = "0.1.0"
-dependencies = [
- "id-generator",
- "object-list",
  "once_cell",
- "open-coroutine",
+ "rustversion",
  "timer",
 ]
 

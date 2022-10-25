@@ -4,6 +4,5 @@ members = [
     "object-list",
     "timer",
     "id-generator",
-    "open-coroutine",
-    "scheduler"
+    "open-coroutine"
 ]

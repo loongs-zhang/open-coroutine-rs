@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::os::raw::c_void;
 use std::ptr;
-use crossbeam_deque::{Stealer, Worker};
+use crossbeam_deque::{Steal, Stealer, Worker};
 
 #[derive(Debug, PartialEq)]
 pub struct ObjectList {
@@ -223,8 +223,8 @@ impl StealableObjectList {
         self.inner.is_empty()
     }
 
-    pub fn stealer_raw(&self) -> Stealer<*mut c_void> {
-        self.inner.stealer()
+    pub fn steal_to(&self, dest:&StealableObjectList) -> Steal<()> {
+        self.inner.stealer().steal_batch(&dest.inner)
     }
 }
 
