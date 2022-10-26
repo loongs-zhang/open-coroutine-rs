@@ -215,6 +215,15 @@ impl StealableObjectList {
         self.inner.pop()
     }
 
+    pub fn move_front_to_back(&mut self) {
+        match self.inner.pop() {
+            Some(pointer) => {
+                self.inner.push(pointer)
+            }
+            None => {}
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.inner.len()
     }
@@ -223,7 +232,7 @@ impl StealableObjectList {
         self.inner.is_empty()
     }
 
-    pub fn steal_to(&self, dest:&StealableObjectList) -> Steal<()> {
+    pub fn steal_to(&self, dest: &StealableObjectList) -> Steal<()> {
         self.inner.stealer().steal_batch(&dest.inner)
     }
 }

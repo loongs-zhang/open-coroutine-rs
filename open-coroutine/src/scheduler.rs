@@ -187,8 +187,8 @@ impl Scheduler {
         scheduled
     }
 
-    pub fn get_ready(&self) -> &StealableObjectList {
-        &self.ready
+    pub fn get_ready(&mut self) -> &mut StealableObjectList {
+        &mut self.ready
     }
 
     pub fn get_finished(&self) -> &ObjectList {
@@ -199,6 +199,7 @@ impl Scheduler {
 #[cfg(test)]
 mod tests {
     use std::os::raw::c_void;
+    use std::os::unix::thread::JoinHandleExt;
     use std::thread;
     use std::time::Duration;
     use crate::coroutine::Coroutine;
@@ -340,5 +341,35 @@ mod tests {
         }, Some(2usize as *mut c_void)));
         let scheduler2 = Scheduler::current();
         assert_eq!(scheduler1, scheduler2);
+    }
+
+    #[test]
+    fn preempt() {
+        static mut RUN: bool = true;
+        unsafe fn callback() {
+            println!("preempt schedule successfully");
+            let mut scheduler = Scheduler::current();
+            let queue = scheduler.get_ready();
+            queue.move_front_to_back();
+            scheduler.try_schedule();
+            RUN = false;
+        }
+        let pthread=thread::spawn(|| {
+            let mut scheduler = Scheduler::current();
+            scheduler.execute(Coroutine::new(2048, |param| unsafe {
+                libc::signal(libc::SIGURG, callback as usize);
+                while RUN {}
+                println!("coroutine1 finished");
+                None
+            }, None));
+            scheduler.execute(Coroutine::new(2048, |param| {
+                println!("coroutine2 finished");
+                None
+            }, None));
+            scheduler.try_schedule();
+        }).as_pthread_t();
+        thread::sleep(Duration::from_millis(100));
+        unsafe { libc::pthread_kill(pthread, libc::SIGURG); }
+        thread::sleep(Duration::from_millis(100));
     }
 }

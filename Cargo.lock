@@ -21,6 +21,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "context"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54c3a572602998217082b234bc06846daec11ce690b0c44955d130f09941ecb2"
+dependencies = [
+ "cc",
+ "kernel32-sys",
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "crossbeam-deque"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -116,7 +128,9 @@ name = "open-coroutine"
 version = "0.1.0"
 dependencies = [
  "cc",
+ "context",
  "id-generator",
+ "libc",
  "memory-pool",
  "object-list",
  "once_cell",
