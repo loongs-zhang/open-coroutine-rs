@@ -44,7 +44,16 @@ unsafe impl Send for Scheduler {}
 unsafe impl Sync for Scheduler {}
 
 impl Scheduler {
-    pub fn new() -> Self {
+    fn new() -> Self {
+        //hook signal以支持抢占调度
+        unsafe {
+            fn callback() {
+                let mut scheduler = Scheduler::current();
+                scheduler.move_and_schedule();
+            }
+            libc::signal(libc::SIGURG, callback as usize);
+        }
+        //构造
         Scheduler {
             id: IdGenerator::next_id("scheduler"),
             ready: StealableObjectList::new(),
@@ -187,8 +196,13 @@ impl Scheduler {
         scheduled
     }
 
-    pub fn get_ready(&mut self) -> &mut StealableObjectList {
-        &mut self.ready
+    pub fn get_ready(&self) -> &StealableObjectList {
+        &self.ready
+    }
+
+    pub fn move_and_schedule(&mut self) -> ObjectList {
+        &self.ready.move_front_to_back();
+        self.try_schedule()
     }
 
     pub fn get_finished(&self) -> &ObjectList {
@@ -346,18 +360,15 @@ mod tests {
     #[test]
     fn preempt() {
         static mut RUN: bool = true;
-        unsafe fn callback() {
-            println!("preempt schedule successfully");
-            let mut scheduler = Scheduler::current();
-            let queue = scheduler.get_ready();
-            queue.move_front_to_back();
-            scheduler.try_schedule();
+        unsafe fn user_signal() {
             RUN = false;
         }
         let pthread = thread::spawn(|| {
             let mut scheduler = Scheduler::current();
             scheduler.execute(Coroutine::new(2048, |param| unsafe {
-                libc::signal(libc::SIGURG, callback as usize);
+                println!("coroutine1 started");
+                libc::signal(libc::SIGUSR1, user_signal as usize);
+                println!("coroutine1 signal registered");
                 while RUN {}
                 println!("coroutine1 finished");
                 None
@@ -369,7 +380,11 @@ mod tests {
             scheduler.try_schedule();
         }).as_pthread_t();
         thread::sleep(Duration::from_millis(100));
-        unsafe { libc::pthread_kill(pthread, libc::SIGURG); }
-        thread::sleep(Duration::from_millis(100));
+        unsafe {
+            libc::pthread_kill(pthread, libc::SIGURG);
+            thread::sleep(Duration::from_millis(100));
+            libc::pthread_kill(pthread, libc::SIGUSR1);
+        }
+        thread::sleep(Duration::from_millis(500));
     }
 }
