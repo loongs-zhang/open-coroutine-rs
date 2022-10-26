@@ -5,7 +5,6 @@ use std::time::Duration;
 use once_cell::sync::Lazy;
 use id_generator::IdGenerator;
 use object_list::ObjectList;
-use object_list::StealableObjectList;
 use timer::TimerList;
 use crate::coroutine::{Coroutine, Status};
 
@@ -20,7 +19,7 @@ thread_local! {
 #[derive(Debug)]
 pub struct Scheduler {
     id: usize,
-    ready: StealableObjectList,
+    ready: ObjectList,
     //正在执行的协程id
     running: Option<usize>,
     suspend: TimerList,
@@ -56,7 +55,7 @@ impl Scheduler {
         //构造
         Scheduler {
             id: IdGenerator::next_id("scheduler"),
-            ready: StealableObjectList::new(),
+            ready: ObjectList::new(),
             running: None,
             suspend: TimerList::new(),
             system_call: ObjectList::new(),
@@ -82,6 +81,7 @@ impl Scheduler {
             return;
         }
         coroutine.set_status(Status::Ready);
+        coroutine.set_scheduler(self);
         self.ready.push_back(coroutine);
     }
 
@@ -93,12 +93,40 @@ impl Scheduler {
     pub fn execute_at(&mut self, time: u64, mut coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
         coroutine.set_execute_time(time)
             .set_status(Status::Suspend);
+        coroutine.set_scheduler(self);
         self.suspend.insert(time, coroutine);
     }
 
     pub fn try_schedule(&mut self) -> ObjectList {
         self.check_ready();
+        self.mark_entrance();
         self.do_schedule()
+    }
+
+    fn mark_entrance(&mut self) {
+        match self.ready.front_mut_raw() {
+            Some(front_pointer) => {
+                let mut front = unsafe {
+                    ptr::read_unaligned(front_pointer as
+                        *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
+                };
+                match self.ready.back_mut_raw() {
+                    Some(back_pointer) => {
+                        if front_pointer != back_pointer {
+                            let mut back = unsafe {
+                                ptr::read_unaligned(back_pointer as
+                                    *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
+                            };
+                            back.set_entrance(&front);
+                            std::mem::forget(back);
+                        }
+                    }
+                    None => {}
+                }
+                std::mem::forget(front);
+            }
+            None => {}
+        }
     }
 
     fn do_schedule(&mut self) -> ObjectList {
@@ -121,7 +149,6 @@ impl Scheduler {
                         continue;
                     }
                     self.running = Some(coroutine.get_id());
-                    coroutine.set_scheduler(self);
                     let result = coroutine.resume();
                     self.running = None;
                     //移动至"已完成"队列
@@ -196,7 +223,7 @@ impl Scheduler {
         scheduled
     }
 
-    pub fn get_ready(&self) -> &StealableObjectList {
+    pub fn get_ready(&self) -> &ObjectList {
         &self.ready
     }
 

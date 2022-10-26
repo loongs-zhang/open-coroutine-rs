@@ -172,6 +172,15 @@ impl ObjectList {
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
+
+    pub fn move_front_to_back(&mut self) {
+        match self.inner.pop_front() {
+            Some(pointer) => {
+                self.inner.push_back(pointer)
+            }
+            None => {}
+        }
+    }
 }
 
 impl AsRef<ObjectList> for ObjectList {
