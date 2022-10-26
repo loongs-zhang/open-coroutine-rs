@@ -354,7 +354,7 @@ mod tests {
             scheduler.try_schedule();
             RUN = false;
         }
-        let pthread=thread::spawn(|| {
+        let pthread = thread::spawn(|| {
             let mut scheduler = Scheduler::current();
             scheduler.execute(Coroutine::new(2048, |param| unsafe {
                 libc::signal(libc::SIGURG, callback as usize);
