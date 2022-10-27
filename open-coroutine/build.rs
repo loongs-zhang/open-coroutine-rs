@@ -63,7 +63,7 @@ fn main() {
         ("gas", "S")
     };
 
-    let prefixes = ["jump", "make"];
+    let prefixes = ["jump", "make", "ontop"];
     let base_path: PathBuf = ["src", "asm"].iter().collect();
     let mut config = cc::Build::new();
 

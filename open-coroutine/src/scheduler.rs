@@ -50,7 +50,8 @@ impl Scheduler {
                 let mut scheduler = Scheduler::current();
                 scheduler.move_and_schedule();
             }
-            libc::signal(libc::SIGURG, callback as usize);
+            //SIGURG
+            libc::signal(23, callback as usize);
         }
         //构造
         Scheduler {

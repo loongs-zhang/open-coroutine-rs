@@ -10,7 +10,6 @@ timer = { path = "../timer" }
 id-generator = { path = "../id-generator" }
 libc = "0.2.119"
 once_cell = "1.13.0"
-context = "2.1.0"
 
 [build-dependencies]
 cc = "1.0.73"

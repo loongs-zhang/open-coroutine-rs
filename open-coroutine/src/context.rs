@@ -63,6 +63,16 @@ impl Context {
     pub(crate) fn switch(to: &Context, param: *mut c_void) -> Transfer {
         unsafe { jump_fcontext(to.0, param) }
     }
+
+    #[inline(always)]
+    pub(crate) fn resume_ontop(self, param: *mut c_void, f: ResumeOntopFn) -> Transfer {
+        unsafe { ontop_fcontext(self.0, param, f) }
+    }
+
+    #[inline(always)]
+    pub(crate) fn defer(to: &Context, param: *mut c_void, f: ResumeOntopFn) -> Transfer {
+        unsafe { ontop_fcontext(to.0, param, f) }
+    }
 }
 
 /// Contains the previously active `Context` and the `data` passed to resume the current one and
@@ -95,10 +105,17 @@ impl Transfer {
     pub fn switch(to: &Transfer) -> Transfer {
         Context::switch(&to.context, to.data)
     }
+
+    pub fn defer(to: &Transfer, f: ResumeOntopFn) -> Transfer {
+        Context::defer(&to.context, to.data, f)
+    }
 }
 
 /// Functions of this signature are used as the entry point for a new `Context`.
 pub type ContextFn = extern "C" fn(t: Transfer);
+
+/// Functions of this signature are used as the callback while resuming ontop of a `Context`.
+pub type ResumeOntopFn = extern "C" fn(t: Transfer) -> Transfer;
 
 extern "C" {
     /// Creates a new `Context` ontop of some stack.
@@ -120,6 +137,17 @@ extern "C" {
     #[inline(never)]
     #[allow(unused)]
     fn jump_fcontext(to: &'static c_void, param: *mut c_void) -> Transfer;
+
+    /// Yields the execution to another `Context` and executes a function "ontop" of it's stack.
+    ///
+    /// # Arguments
+    /// * `to` - A pointer to the `Context` with whom we swap execution.
+    /// * `p`  - An arbitrary argument that will be set as the `data` field
+    ///          of the `Transfer` object passed to the other Context.
+    /// * `f`  - A function to be invoked on `to` before returning.
+    #[inline(never)]
+    #[allow(unused)]
+    fn ontop_fcontext(to: &'static c_void, param: *mut c_void, f: ResumeOntopFn) -> Transfer;
 }
 
 #[cfg(test)]
@@ -170,5 +198,46 @@ mod tests {
         }
 
         println!("inner context test finished!");
+    }
+
+    #[test]
+    fn defer() {
+        // This method will always `resume()` immediately back to the
+        // previous `Context` with a `data` value incremented by one starting at 0.
+        // You could thus describe this method as a "natural number generator".
+        extern "C" fn context_function(mut t: Transfer) {
+            loop {
+                print!("Yielding {} => ", t.data as usize);
+                t = Transfer::defer(&t, add_one);
+            }
+        }
+
+        extern "C" fn add_one(mut t: Transfer) -> Transfer {
+            let mut data = t.data as usize;
+            data += 1;
+            t.data = data as *mut c_void;
+            t
+        }
+
+        // Allocate some stack.
+        let stack = Memory::default();
+
+        let context = unsafe { Context::new(ManuallyDrop::new(stack), context_function) };
+
+        // Allocate a Context on the stack.
+        let mut t = Transfer::new(context, 0 as *mut c_void);
+
+        // Yield 10 times to `context_function()`.
+        for i in 0..10 {
+            // Yield to the "frozen" state of `context_function()`.
+            // The `data` value is not used in this example and is left at 0.
+            // The first and every other call will return references to the actual `Context` data.
+            print!("Resuming => ");
+            t = unsafe { t.context.resume(i as *mut c_void) };
+
+            println!("Got {}", t.data as usize);
+        }
+
+        println!("Finished!");
     }
 }
