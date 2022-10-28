@@ -44,15 +44,6 @@ unsafe impl Sync for Scheduler {}
 
 impl Scheduler {
     fn new() -> Self {
-        //hook signal以支持抢占调度
-        unsafe {
-            fn callback() {
-                let mut scheduler = Scheduler::current();
-                scheduler.move_and_schedule();
-            }
-            //SIGURG
-            libc::signal(23, callback as usize);
-        }
         //构造
         Scheduler {
             id: IdGenerator::next_id("scheduler"),
@@ -383,36 +374,5 @@ mod tests {
         }, Some(2usize as *mut c_void)));
         let scheduler2 = Scheduler::current();
         assert_eq!(scheduler1, scheduler2);
-    }
-
-    #[test]
-    fn preempt() {
-        static mut RUN: bool = true;
-        unsafe fn user_signal() {
-            RUN = false;
-        }
-        let pthread = thread::spawn(|| {
-            let mut scheduler = Scheduler::current();
-            scheduler.execute(Coroutine::new(2048, |param| unsafe {
-                println!("coroutine1 started");
-                libc::signal(libc::SIGUSR1, user_signal as usize);
-                println!("coroutine1 signal registered");
-                while RUN {}
-                println!("coroutine1 finished");
-                None
-            }, None));
-            scheduler.execute(Coroutine::new(2048, |param| {
-                println!("coroutine2 finished");
-                None
-            }, None));
-            scheduler.try_schedule();
-        }).as_pthread_t();
-        thread::sleep(Duration::from_millis(100));
-        unsafe {
-            libc::pthread_kill(pthread, libc::SIGURG);
-            thread::sleep(Duration::from_millis(100));
-            libc::pthread_kill(pthread, libc::SIGUSR1);
-        }
-        thread::sleep(Duration::from_millis(500));
     }
 }

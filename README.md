@@ -20,4 +20,6 @@
    
    [may](https://github.com/Xudong-Huang/may)
 
+   [corosensei](https://github.com/Amanieu/corosensei)
+
 感谢这些库的作者选择开源
