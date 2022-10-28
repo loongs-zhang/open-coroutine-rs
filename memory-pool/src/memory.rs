@@ -205,13 +205,23 @@ mod tests {
     #[test]
     fn stack_size_too_large() {
         let stack_size = system::max_size(true);
-        match Memory::new(stack_size) {
+        match Memory::allocate(stack_size, true) {
             Err(MemoryError::ExceedsMaximumSize(_)) => panic!(),
             _ => {}
         }
-
         let stack_size = stack_size + 1;
-        match Memory::new(stack_size) {
+        match Memory::allocate(stack_size, true) {
+            Err(MemoryError::ExceedsMaximumSize(..)) => {}
+            _ => panic!(),
+        }
+
+        let stack_size = system::max_size(false);
+        match Memory::allocate(stack_size, false) {
+            Err(MemoryError::ExceedsMaximumSize(_)) => panic!(),
+            _ => {}
+        }
+        let stack_size = stack_size + 1;
+        match Memory::allocate(stack_size, false) {
             Err(MemoryError::ExceedsMaximumSize(..)) => {}
             _ => panic!(),
         }

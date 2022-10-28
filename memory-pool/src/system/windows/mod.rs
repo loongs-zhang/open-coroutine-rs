@@ -79,6 +79,10 @@ pub fn min_size() -> usize {
 }
 
 // Windows does not seem to provide a stack limit API
-pub fn max_size(_: bool) -> usize {
-    usize::MAX
+pub fn max_size(protected: bool) -> usize {
+    let page_size = page_size();
+    let add_shift = if protected { 1 } else { 0 };
+    let protected = page_size << add_shift;
+    let size = (usize::MAX - 1) & !(page_size - 1);
+    size - protected
 }
