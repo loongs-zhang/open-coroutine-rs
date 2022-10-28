@@ -232,7 +232,6 @@ impl Scheduler {
 #[cfg(test)]
 mod tests {
     use std::os::raw::c_void;
-    use std::os::unix::thread::JoinHandleExt;
     use std::thread;
     use std::time::Duration;
     use crate::coroutine::Coroutine;
