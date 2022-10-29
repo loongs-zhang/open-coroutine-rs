@@ -1,0 +1,13 @@
+[package]
+name = "libc-x"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# 添加libc的依赖后，就不需要再重复地一个个声明系统函数了
+libc = "0.2.119"
+libhook = { path = "../libhook" }
+object-list = { path = "../object-list" }
+open-coroutine = { path = "../open-coroutine" }
+
+#todo 用bindgen从c/c++头文件自动生成rust代码

@@ -4,5 +4,7 @@ members = [
     "object-list",
     "timer",
     "id-generator",
-    "open-coroutine"
+    "open-coroutine",
+    "libhook",
+    "libc-x"
 ]

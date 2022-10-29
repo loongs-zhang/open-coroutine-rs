@@ -55,6 +55,7 @@ impl Error for MemoryError {
 ///
 /// `FixedSizeStack` as well as `ProtectedFixedSizeStack`
 /// can be used to allocate actual stack space.
+#[repr(C)]
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct Memory {
     top: *mut c_void,

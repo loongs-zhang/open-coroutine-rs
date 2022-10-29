@@ -71,6 +71,7 @@ impl Context {
     }
 
     #[inline(always)]
+    #[allow(unused)]
     pub(crate) fn defer(to: &Context, param: *mut c_void, f: ResumeOntopFn) -> Transfer {
         unsafe { ontop_fcontext(to.0, param, f) }
     }
@@ -107,6 +108,7 @@ impl Transfer {
         Context::switch(&to.context, to.data)
     }
 
+    #[allow(unused)]
     pub fn defer(to: &Transfer, f: ResumeOntopFn) -> Transfer {
         Context::defer(&to.context, to.data, f)
     }

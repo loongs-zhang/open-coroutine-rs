@@ -57,6 +57,7 @@ impl TimerEntry {
     }
 }
 
+#[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct TimerList {
     dequeue: VecDeque<TimerEntry>,

@@ -7,6 +7,7 @@ use memory_pool::memory::Memory;
 use crate::context::{Context, Transfer};
 use crate::scheduler::Scheduler;
 
+#[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Status {
     ///协程被创建
@@ -27,6 +28,7 @@ pub enum Status {
     Exited,
 }
 
+#[repr(C)]
 #[derive(Debug)]
 pub struct Coroutine<F: ?Sized> {
     id: usize,

@@ -16,6 +16,7 @@ thread_local! {
     static SCHEDULER: Box<Scheduler> = Box::new(Scheduler::new());
 }
 
+#[repr(C)]
 #[derive(Debug)]
 pub struct Scheduler {
     id: usize,
@@ -64,6 +65,19 @@ impl Scheduler {
         SCHEDULER.with(|boxed| {
             Box::leak(unsafe { ptr::read_unaligned(boxed) })
         })
+    }
+
+    pub fn push(&mut self, mut coroutine: Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
+        let time = coroutine.get_execute_time();
+        coroutine.set_scheduler(self);
+        if timer::now() < time {
+            coroutine.set_execute_time(time)
+                .set_status(Status::Suspend);
+            self.suspend.insert(time, coroutine);
+            return;
+        }
+        coroutine.set_status(Status::Ready);
+        self.ready.push_back(coroutine);
     }
 
     pub fn execute(&mut self, mut coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {

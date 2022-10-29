@@ -3,6 +3,7 @@ use std::os::raw::c_void;
 use std::ptr;
 use crossbeam_deque::{Steal, Worker};
 
+#[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ObjectList {
     inner: VecDeque<*mut c_void>,
