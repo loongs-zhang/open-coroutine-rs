@@ -58,8 +58,8 @@ impl<F> Coroutine<F>
                 if timer::now() < (*context).exec_time {
                     //优先继续执行其他协程，否则让出CPU时间片
                     match (*context).scheduler {
-                        Some(mut scheduler) => {
-                            unsafe { (*scheduler).try_schedule(); }
+                        Some( scheduler) => {
+                            (*scheduler).try_schedule();
                         }
                         None => thread::yield_now()
                     }
@@ -89,8 +89,8 @@ impl<F> Coroutine<F>
                             None => {
                                 //不回跳，直接执行下一个协程
                                 match (*context).scheduler {
-                                    Some(mut scheduler) => {
-                                        unsafe { (*scheduler).try_schedule(); }
+                                    Some(scheduler) => {
+                                        (*scheduler).try_schedule();
                                     }
                                     None => {
                                         //如果没有，也能跑，性能差一些

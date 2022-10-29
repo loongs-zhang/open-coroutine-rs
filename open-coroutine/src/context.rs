@@ -65,6 +65,7 @@ impl Context {
     }
 
     #[inline(always)]
+    #[allow(unused)]
     pub(crate) fn resume_ontop(self, param: *mut c_void, f: ResumeOntopFn) -> Transfer {
         unsafe { ontop_fcontext(self.0, param, f) }
     }
@@ -222,7 +223,7 @@ mod tests {
         // Allocate some stack.
         let stack = Memory::default();
 
-        let context = unsafe { Context::new(ManuallyDrop::new(stack), context_function) };
+        let context = Context::new(ManuallyDrop::new(stack), context_function);
 
         // Allocate a Context on the stack.
         let mut t = Transfer::new(context, 0 as *mut c_void);
@@ -233,7 +234,7 @@ mod tests {
             // The `data` value is not used in this example and is left at 0.
             // The first and every other call will return references to the actual `Context` data.
             print!("Resuming => ");
-            t = unsafe { t.context.resume(i as *mut c_void) };
+            t = t.context.resume(i as *mut c_void);
 
             println!("Got {}", t.data as usize);
         }

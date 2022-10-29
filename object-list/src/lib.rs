@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::os::raw::c_void;
 use std::ptr;
-use crossbeam_deque::{Steal, Stealer, Worker};
+use crossbeam_deque::{Steal, Worker};
 
 #[derive(Debug, PartialEq)]
 pub struct ObjectList {
@@ -197,6 +197,7 @@ impl AsMut<ObjectList> for ObjectList {
 
 #[derive(Debug)]
 pub struct StealableObjectList {
+    //todo add head/tail field
     inner: Worker<*mut c_void>,
 }
 

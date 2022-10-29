@@ -98,7 +98,7 @@ impl Scheduler {
     fn mark_entrance(&mut self) {
         match self.ready.front_mut_raw() {
             Some(front_pointer) => {
-                let mut front = unsafe {
+                let front = unsafe {
                     ptr::read_unaligned(front_pointer as
                         *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
                 };
@@ -217,11 +217,6 @@ impl Scheduler {
 
     pub fn get_ready(&self) -> &ObjectList {
         &self.ready
-    }
-
-    pub fn move_and_schedule(&mut self) -> ObjectList {
-        &self.ready.move_front_to_back();
-        self.try_schedule()
     }
 
     pub fn get_finished(&self) -> &ObjectList {

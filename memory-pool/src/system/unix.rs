@@ -104,9 +104,9 @@ pub fn max_size(protected: bool) -> usize {
         }
     }
 
-    if protected {
-        ret - page_size()
-    } else {
-        ret
-    }
+    let page_size = page_size();
+    let add_shift = if protected { 1 } else { 0 };
+    let protected = page_size << add_shift;
+    let size = (ret - 1) & !(page_size - 1);
+    size - protected
 }

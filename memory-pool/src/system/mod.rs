@@ -5,8 +5,6 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-use std::cmp;
-
 #[cfg(unix)]
 mod unix;
 
@@ -36,6 +34,5 @@ pub use self::windows::{
 pub fn default_size(protected: bool) -> usize {
     let size = self::min_size() * 8;
     let max_stack_size = self::max_size(protected);
-
-    cmp::min(size, max_stack_size)
+    size.min(max_stack_size)
 }
