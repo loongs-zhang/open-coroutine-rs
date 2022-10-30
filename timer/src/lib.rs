@@ -21,11 +21,10 @@ pub fn dur_to_ns(dur: Duration) -> u64 {
 }
 
 pub fn get_timeout_time(dur: Duration) -> u64 {
-    let interval = dur_to_ns(dur);
-    return now() + interval;
+    now() + dur_to_ns(dur)
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct TimerEntry {
     time: u64,
     dequeue: ObjectList,
@@ -38,6 +37,10 @@ impl TimerEntry {
 
     pub fn len(&self) -> usize {
         self.dequeue.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.dequeue.is_empty()
     }
 
     pub fn get_time(&self) -> u64 {
@@ -58,7 +61,7 @@ impl TimerEntry {
 }
 
 #[repr(C)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct TimerList {
     dequeue: VecDeque<TimerEntry>,
 }
@@ -95,6 +98,16 @@ impl TimerList {
 
     pub fn pop_front(&mut self) -> Option<TimerEntry> {
         self.dequeue.pop_front()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.dequeue.is_empty()
+    }
+}
+
+impl Default for TimerList {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

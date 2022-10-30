@@ -1,5 +1,4 @@
 use std::os::raw::c_void;
-use open_coroutine::coroutine::Coroutine;
 
 extern "C" {
     pub fn coroutine_crate(coroutine: *mut c_void);
@@ -7,7 +6,6 @@ extern "C" {
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::c_void;
     use open_coroutine::coroutine::Coroutine;
     use crate::coroutine_crate;
 
@@ -19,7 +17,7 @@ mod tests {
                 println!("hello from coroutine {}", x);
                 param
             }, None);
-            coroutine_crate(unsafe { std::mem::transmute(&mut co) });
+            coroutine_crate(std::mem::transmute(&mut co));
             libc::sleep(1);
         }
     }

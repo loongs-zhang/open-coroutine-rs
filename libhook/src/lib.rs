@@ -20,7 +20,7 @@ pub extern "C" fn coroutine_crate(pointer: *mut c_void) {
         ptr::read_unaligned(pointer as
             *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
     };
-    Scheduler::current().push(coroutine)
+    Scheduler::current().submit(coroutine)
 }
 
 #[no_mangle]

@@ -11,8 +11,6 @@ use std::os::raw::c_void;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::usize;
 
-use libc;
-
 use crate::memory::Memory;
 
 #[cfg(any(target_os = "openbsd", target_os = "macos", target_os = "ios", target_os = "android"))]
@@ -38,7 +36,7 @@ pub unsafe fn allocate(size: usize) -> io::Result<Memory> {
 pub unsafe fn protect(stack: &Memory) -> io::Result<Memory> {
     let page_size = page_size();
 
-    debug_assert!(stack.len() % page_size == 0 && stack.len() != 0);
+    debug_assert!(stack.len() % page_size == 0 && !stack.is_empty());
 
     let ret = {
         let bottom = stack.bottom() as *mut libc::c_void;

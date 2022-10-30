@@ -4,7 +4,7 @@ use std::ptr;
 use crossbeam_deque::{Steal, Worker};
 
 #[repr(C)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ObjectList {
     inner: VecDeque<*mut c_void>,
 }
@@ -46,12 +46,7 @@ impl ObjectList {
     }
 
     pub fn front_mut_raw(&mut self) -> Option<*mut c_void> {
-        match self.inner.front_mut() {
-            Some(value) => {
-                unsafe { Some(ptr::read_unaligned(value)) }
-            }
-            None => None
-        }
+        self.inner.front_mut().map(|value| unsafe { ptr::read_unaligned(value) })
     }
 
     pub fn push_front<T>(&mut self, element: T) {
@@ -102,12 +97,7 @@ impl ObjectList {
     }
 
     pub fn back_mut_raw(&mut self) -> Option<*mut c_void> {
-        match self.inner.back_mut() {
-            Some(value) => {
-                unsafe { Some(ptr::read_unaligned(value)) }
-            }
-            None => None
-        }
+        self.inner.back_mut().map(|value| unsafe { ptr::read_unaligned(value) })
     }
 
     pub fn push_back<T>(&mut self, element: T) {
@@ -162,12 +152,7 @@ impl ObjectList {
     }
 
     pub fn get_mut_raw(&mut self, index: usize) -> Option<*mut c_void> {
-        match self.inner.get_mut(index) {
-            Some(pointer) => {
-                unsafe { Some(ptr::read_unaligned(pointer)) }
-            }
-            None => None
-        }
+        self.inner.get_mut(index).map(|pointer| unsafe { ptr::read_unaligned(pointer) })
     }
 
     pub fn is_empty(&self) -> bool {
@@ -175,18 +160,21 @@ impl ObjectList {
     }
 
     pub fn move_front_to_back(&mut self) {
-        match self.inner.pop_front() {
-            Some(pointer) => {
-                self.inner.push_back(pointer)
-            }
-            None => {}
+        if let Some(pointer) = self.inner.pop_front() {
+            self.inner.push_back(pointer)
         }
+    }
+}
+
+impl Default for ObjectList {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 impl AsRef<ObjectList> for ObjectList {
     fn as_ref(&self) -> &ObjectList {
-        &*self
+        self
     }
 }
 
@@ -227,11 +215,8 @@ impl StealableObjectList {
     }
 
     pub fn move_front_to_back(&mut self) {
-        match self.inner.pop() {
-            Some(pointer) => {
-                self.inner.push(pointer)
-            }
-            None => {}
+        if let Some(pointer) = self.inner.pop() {
+            self.inner.push(pointer)
         }
     }
 
@@ -248,9 +233,15 @@ impl StealableObjectList {
     }
 }
 
+impl Default for StealableObjectList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AsRef<StealableObjectList> for StealableObjectList {
     fn as_ref(&self) -> &StealableObjectList {
-        &*self
+        self
     }
 }
 

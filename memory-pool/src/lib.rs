@@ -55,11 +55,8 @@ pub fn revert(stack: ManuallyDrop<Memory>) {
     unsafe {
         match MEMORY_POOL.write() {
             Ok(mut map) => {
-                match map.get_mut(&stack.len()) {
-                    Some(pool) => {
-                        pool.revert(stack);
-                    }
-                    None => {}
+                if let Some(pool) = map.get_mut(&stack.len()) {
+                    pool.revert(stack);
                 }
             }
             Err(_) => revert(stack)
@@ -71,11 +68,8 @@ pub fn drop(stack: ManuallyDrop<Memory>) {
     unsafe {
         match MEMORY_POOL.write() {
             Ok(mut map) => {
-                match map.get_mut(&stack.len()) {
-                    Some(pool) => {
-                        pool.drop(stack);
-                    }
-                    None => {}
+                if let Some(pool) = map.get_mut(&stack.len()) {
+                    pool.drop(stack);
                 }
             }
             Err(_) => drop(stack)

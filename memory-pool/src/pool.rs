@@ -45,13 +45,10 @@ impl SizedMemoryPool {
     fn delete_using(&mut self, stack: &ManuallyDrop<Memory>) {
         //删除using中的元素
         for i in 0..self.using.len() {
-            match self.using.get(i) {
-                Some(s) => {
-                    if s == stack {
-                        self.using.remove(i);
-                    }
+            if let Some(s) = self.using.get(i) {
+                if s == stack {
+                    self.using.remove(i);
                 }
-                None => {}
             }
         }
     }

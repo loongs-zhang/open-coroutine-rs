@@ -60,7 +60,7 @@ impl<F> Coroutine<F>
                 if timer::now() < (*context).exec_time {
                     //优先继续执行其他协程，否则让出CPU时间片
                     match (*context).scheduler {
-                        Some( scheduler) => {
+                        Some(scheduler) => {
                             (*scheduler).try_schedule();
                         }
                         None => thread::yield_now()
@@ -90,14 +90,10 @@ impl<F> Coroutine<F>
                             }
                             None => {
                                 //不回跳，直接执行下一个协程
-                                match (*context).scheduler {
-                                    Some(scheduler) => {
-                                        (*scheduler).try_schedule();
-                                    }
-                                    None => {
-                                        //如果没有，也能跑，性能差一些
-                                    }
+                                if let Some(scheduler) = (*context).scheduler {
+                                    (*scheduler).try_schedule();
                                 }
+                                //如果没有，也能跑，只不过回跳次数会更多
                             }
                         }
                     }
@@ -126,7 +122,7 @@ impl<F> Coroutine<F>
             next: Option<*mut c_void>) -> Self {
         let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
         // Allocate a Context on the stack.
-        let sp = Transfer::new(inner, 0 as *mut c_void);
+        let sp = Transfer::new(inner, ptr::null_mut());
         let mut context = Coroutine {
             id,
             stack,

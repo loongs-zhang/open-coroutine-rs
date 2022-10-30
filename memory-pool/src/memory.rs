@@ -39,7 +39,7 @@ impl Error for MemoryError {
             MemoryError::ExceedsMaximumSize(_) => "exceeds maximum stack size",
             MemoryError::IoError(ref e) => {
                 #[allow(deprecated)]
-                e.description()
+                    e.description()
             }
         }
     }
@@ -136,6 +136,11 @@ impl Memory {
     #[inline]
     pub fn len(&self) -> usize {
         self.top as usize - self.bottom as usize
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Returns the minimal stack size allowed by the current platform.

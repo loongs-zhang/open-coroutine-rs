@@ -67,7 +67,7 @@ impl Scheduler {
         })
     }
 
-    pub fn push(&mut self, mut coroutine: Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
+    pub fn submit(&mut self, mut coroutine: Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
         let time = coroutine.get_execute_time();
         coroutine.set_scheduler(self);
         if timer::now() < time {
@@ -110,60 +110,51 @@ impl Scheduler {
     }
 
     fn mark_entrance(&mut self) {
-        match self.ready.front_mut_raw() {
-            Some(front_pointer) => {
-                let front = unsafe {
-                    ptr::read_unaligned(front_pointer as
-                        *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
-                };
-                match self.ready.back_mut_raw() {
-                    Some(back_pointer) => {
-                        if front_pointer != back_pointer {
-                            let mut back = unsafe {
-                                ptr::read_unaligned(back_pointer as
-                                    *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
-                            };
-                            back.set_entrance(&front);
-                            std::mem::forget(back);
-                        }
-                    }
-                    None => {}
+        if let Some(front_pointer) = self.ready.front_mut_raw() {
+            let front = unsafe {
+                ptr::read_unaligned(front_pointer as
+                    *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
+            };
+            if let Some(back_pointer) = self.ready.back_mut_raw() {
+                if front_pointer != back_pointer {
+                    let mut back = unsafe {
+                        ptr::read_unaligned(back_pointer as
+                            *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
+                    };
+                    back.set_entrance(&front);
+                    std::mem::forget(back);
                 }
-                std::mem::forget(front);
             }
-            None => {}
+            std::mem::forget(front);
         }
     }
 
     fn do_schedule(&mut self) -> ObjectList {
         let mut scheduled = ObjectList::new();
         for _ in 0..self.ready.len() {
-            match self.ready.pop_front_raw() {
-                Some(pointer) => {
-                    let mut coroutine = unsafe {
-                        ptr::read_unaligned(pointer as
-                            *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
-                    };
-                    //fixme 这里拿到的时间不对
-                    let exec_time = coroutine.get_execute_time();
-                    //过滤未到执行时间的协程
-                    if timer::now() < exec_time {
-                        //设置协程状态
-                        coroutine.set_status(Status::Suspend);
-                        //移动至"挂起"队列
-                        self.suspend.insert(exec_time, coroutine);
-                        continue;
-                    }
-                    self.running = Some(coroutine.get_id());
-                    let result = coroutine.resume();
-                    self.running = None;
-                    //移动至"已完成"队列
-                    scheduled.push_back(unsafe { ptr::read_unaligned(&result) });
-                    self.finished.push_back(result);
-                    coroutine.exit();
-                    std::mem::forget(coroutine);
+            if let Some(pointer) = self.ready.pop_front_raw() {
+                let mut coroutine = unsafe {
+                    ptr::read_unaligned(pointer as
+                        *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
+                };
+                //fixme 这里拿到的时间不对
+                let exec_time = coroutine.get_execute_time();
+                //过滤未到执行时间的协程
+                if timer::now() < exec_time {
+                    //设置协程状态
+                    coroutine.set_status(Status::Suspend);
+                    //移动至"挂起"队列
+                    self.suspend.insert(exec_time, coroutine);
+                    continue;
                 }
-                None => {}
+                self.running = Some(coroutine.get_id());
+                let result = coroutine.resume();
+                self.running = None;
+                //移动至"已完成"队列
+                scheduled.push_back(unsafe { ptr::read_unaligned(&result) });
+                self.finished.push_back(result);
+                coroutine.exit();
+                std::mem::forget(coroutine);
             }
         }
         scheduled
@@ -171,33 +162,24 @@ impl Scheduler {
 
     fn check_ready(&mut self) {
         for _ in 0..self.suspend.len() {
-            match self.suspend.front() {
-                Some(entry) => {
-                    let exec_time = entry.get_time();
-                    if timer::now() < exec_time {
-                        break;
-                    }
-                    //移动至"就绪"队列
-                    match self.suspend.pop_front() {
-                        Some(mut entry) => {
-                            for _ in 0..entry.len() {
-                                match entry.pop_front_raw() {
-                                    Some(pointer) => {
-                                        unsafe {
-                                            let mut coroutine = ptr::read_unaligned(pointer as
-                                                *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>);
-                                            coroutine.set_status(Status::Ready);
-                                            self.ready.push_back(coroutine)
-                                        }
-                                    }
-                                    None => {}
-                                }
+            if let Some(entry) = self.suspend.front() {
+                let exec_time = entry.get_time();
+                if timer::now() < exec_time {
+                    break;
+                }
+                //移动至"就绪"队列
+                if let Some(mut entry) = self.suspend.pop_front() {
+                    for _ in 0..entry.len() {
+                        if let Some(pointer) = entry.pop_front_raw() {
+                            unsafe {
+                                let mut coroutine = ptr::read_unaligned(pointer as
+                                    *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>);
+                                coroutine.set_status(Status::Ready);
+                                self.ready.push_back(coroutine)
                             }
                         }
-                        None => {}
                     }
                 }
-                None => {}
             }
         }
     }
@@ -205,7 +187,7 @@ impl Scheduler {
     //todo 提供一个block版，如果suspend和ready没有，则把自己挂起
     pub fn schedule(&mut self) -> ObjectList {
         let mut scheduled = ObjectList::new();
-        while self.suspend.len() > 0 || self.ready.len() > 0 {
+        while !self.suspend.is_empty() || !self.ready.is_empty() {
             let mut temp = self.try_schedule();
             while !temp.is_empty() {
                 scheduled.push_back_raw(temp.pop_front_raw().unwrap());
@@ -217,7 +199,7 @@ impl Scheduler {
     pub fn timed_schedule(&mut self, timeout: Duration) -> ObjectList {
         let timeout_time = timer::get_timeout_time(timeout);
         let mut scheduled = ObjectList::new();
-        while self.suspend.len() > 0 || self.ready.len() > 0 {
+        while !self.suspend.is_empty() || !self.ready.is_empty() {
             if timeout_time <= timer::now() {
                 break;
             }
