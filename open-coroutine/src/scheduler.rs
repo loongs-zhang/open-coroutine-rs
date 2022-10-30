@@ -103,6 +103,21 @@ impl Scheduler {
         self.suspend.insert(time, coroutine);
     }
 
+    pub fn try_timed_schedule(&mut self, timeout: Duration) -> ObjectList {
+        let timeout_time = timer::get_timeout_time(timeout);
+        let mut scheduled = ObjectList::new();
+        while !self.suspend.is_empty() || !self.ready.is_empty() {
+            if timeout_time <= timer::now() {
+                break;
+            }
+            let mut temp = self.try_schedule();
+            while !temp.is_empty() {
+                scheduled.push_back_raw(temp.pop_front_raw().unwrap());
+            }
+        }
+        scheduled
+    }
+
     pub fn try_schedule(&mut self) -> ObjectList {
         self.check_ready();
         self.mark_entrance();
@@ -188,21 +203,6 @@ impl Scheduler {
     pub fn schedule(&mut self) -> ObjectList {
         let mut scheduled = ObjectList::new();
         while !self.suspend.is_empty() || !self.ready.is_empty() {
-            let mut temp = self.try_schedule();
-            while !temp.is_empty() {
-                scheduled.push_back_raw(temp.pop_front_raw().unwrap());
-            }
-        }
-        scheduled
-    }
-
-    pub fn timed_schedule(&mut self, timeout: Duration) -> ObjectList {
-        let timeout_time = timer::get_timeout_time(timeout);
-        let mut scheduled = ObjectList::new();
-        while !self.suspend.is_empty() || !self.ready.is_empty() {
-            if timeout_time <= timer::now() {
-                break;
-            }
             let mut temp = self.try_schedule();
             while !temp.is_empty() {
                 scheduled.push_back_raw(temp.pop_front_raw().unwrap());
@@ -343,7 +343,7 @@ mod tests {
         scheduler.delay(Duration::from_millis(500), Coroutine::new(2048, |param| {
             param
         }, None));
-        assert_eq!(0, scheduler.timed_schedule(Duration::from_millis(10)).len());
+        assert_eq!(0, scheduler.try_timed_schedule(Duration::from_millis(10)).len());
     }
 
     #[test]
