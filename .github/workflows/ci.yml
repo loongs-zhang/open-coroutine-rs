@@ -46,7 +46,8 @@ jobs:
           - nightly
         os:
           - ubuntu-latest
-          - windows-latest
+          #由于开发环境是mac，不太好对windows考虑周全，因此先去掉windows的CI
+          #- windows-latest
           - macOS-latest
     steps:
       - name: Checkout sources
