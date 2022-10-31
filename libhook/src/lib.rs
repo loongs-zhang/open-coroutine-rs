@@ -21,8 +21,7 @@ pub fn usleep(secs: libc::c_uint) -> libc::c_int {
     let nsec = (secs - sec * 1000_000) * 1000;
     let rqtp = libc::timespec { tv_sec: sec, tv_nsec: nsec };
     let mut rmtp = libc::timespec { tv_sec: 0, tv_nsec: 0 };
-    nanosleep(&rqtp, &mut rmtp);
-    rmtp.tv_sec as i32
+    nanosleep(&rqtp, &mut rmtp)
 }
 
 #[no_mangle]
