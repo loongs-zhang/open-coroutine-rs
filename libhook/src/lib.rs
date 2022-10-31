@@ -16,7 +16,10 @@ pub extern "C" fn sleep(secs: libc::c_uint) -> libc::c_uint {
 
 #[no_mangle]
 pub fn usleep(secs: libc::c_uint) -> libc::c_int {
-    let rqtp = libc::timespec { tv_sec: 0, tv_nsec: (secs * 1000) as i64 };
+    let secs = secs as i64;
+    let sec = secs / 1000_000;
+    let nsec = (secs - sec * 1000_000) * 1000;
+    let rqtp = libc::timespec { tv_sec: sec, tv_nsec: nsec };
     let mut rmtp = libc::timespec { tv_sec: 0, tv_nsec: 0 };
     nanosleep(&rqtp, &mut rmtp);
     rmtp.tv_sec as i32
@@ -32,6 +35,10 @@ pub fn nanosleep(rqtp: *const libc::timespec, rmtp: *mut libc::timespec) -> libc
     let schedule_finished_time = timer::now();
     let left_time = (timeout_time - schedule_finished_time) as i64;
     if left_time <= 0 {
+        unsafe {
+            (*rmtp).tv_sec = 0;
+            (*rmtp).tv_nsec = 0;
+        }
         return 0;
     }
     let sec = left_time / 1000_000_000;
