@@ -82,5 +82,6 @@ fn main() {
         config.file(path.to_str().unwrap());
     }
 
+    //重点关注linux下x86_64架构的跳转，既jump_x86_64_sysv_elf_gas.S
     config.compile("libboost_context.a");
 }
