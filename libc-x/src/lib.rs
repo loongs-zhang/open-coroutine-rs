@@ -19,13 +19,12 @@ where
 #[cfg(test)]
 mod tests {
     use crate::co_crate;
-    use open_coroutine::coroutine::Coroutine;
 
     #[test]
     fn test_sleep() {
         unsafe {
             let x = 10;
-            let co = co_crate(
+            let _co = co_crate(
                 2048,
                 |param| {
                     println!("hello from coroutine {}", x);
