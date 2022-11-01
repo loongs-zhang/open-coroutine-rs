@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 libc = "0.2.119"
-object-list = { path = "../object-list" }
 open-coroutine = { path = "../open-coroutine" }
 timer = { path = "../timer" }
 

@@ -1,4 +1,3 @@
-use object_list::ObjectList;
 use open_coroutine::coroutine::Coroutine;
 use open_coroutine::scheduler::Scheduler;
 use std::os::raw::c_void;
@@ -21,7 +20,7 @@ pub extern "C" fn sleep(secs: libc::c_uint) -> libc::c_uint {
 }
 
 #[no_mangle]
-pub fn usleep(secs: libc::c_uint) -> libc::c_int {
+pub extern "C" fn usleep(secs: libc::c_uint) -> libc::c_int {
     let secs = secs as i64;
     let sec = secs / 1_000_000;
     let nsec = (secs - sec * 1_000_000) * 1000;
@@ -38,7 +37,7 @@ pub fn usleep(secs: libc::c_uint) -> libc::c_int {
 
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 #[no_mangle]
-pub fn nanosleep(rqtp: *const libc::timespec, rmtp: *mut libc::timespec) -> libc::c_int {
+pub extern "C" fn nanosleep(rqtp: *const libc::timespec, rmtp: *mut libc::timespec) -> libc::c_int {
     let nanos_time = unsafe { (*rqtp).tv_sec * 1_000_000_000 + (*rqtp).tv_nsec } as u64;
     let timeout_time = timer::get_timeout_time(Duration::from_nanos(nanos_time));
     Scheduler::current().try_timed_schedule(Duration::from_nanos(nanos_time));
@@ -72,21 +71,26 @@ pub fn nanosleep(rqtp: *const libc::timespec, rmtp: *mut libc::timespec) -> libc
 
 //#[no_mangle]避免rust编译器修改方法名称
 #[no_mangle]
-pub extern "C" fn coroutine_crate(pointer: *mut c_void) {
+pub extern "C" fn coroutine_crate(pointer: &'static mut c_void) {
     let coroutine = unsafe {
         ptr::read_unaligned(
-            pointer as *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>,
+            pointer as *mut _
+                as *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>,
         )
     };
     Scheduler::current().submit(coroutine)
 }
 
 #[no_mangle]
-pub extern "C" fn try_schedule() -> ObjectList {
-    Scheduler::current().try_schedule()
+pub extern "C" fn try_schedule() -> &'static mut c_void {
+    let list = Scheduler::current().try_schedule();
+    let result = Box::leak(Box::new(list));
+    unsafe { &mut *(result as *mut _ as *mut c_void) }
 }
 
 #[no_mangle]
-pub extern "C" fn schedule() -> ObjectList {
-    Scheduler::current().schedule()
+pub extern "C" fn schedule() -> &'static mut c_void {
+    let list = Scheduler::current().schedule();
+    let result = Box::leak(Box::new(list));
+    unsafe { &mut *(result as *mut _ as *mut c_void) }
 }
