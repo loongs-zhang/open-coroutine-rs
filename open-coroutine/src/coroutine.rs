@@ -1,11 +1,11 @@
-use std::os::raw::c_void;
-use std::{ptr, thread};
-use std::mem::ManuallyDrop;
-use std::time::Duration;
-use id_generator::IdGenerator;
-use memory_pool::memory::Memory;
 use crate::context::{Context, Transfer};
 use crate::scheduler::Scheduler;
+use id_generator::IdGenerator;
+use memory_pool::memory::Memory;
+use std::mem::ManuallyDrop;
+use std::os::raw::c_void;
+use std::time::Duration;
+use std::{ptr, thread};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -51,7 +51,8 @@ pub struct Coroutine<F: ?Sized> {
 }
 
 impl<F> Coroutine<F>
-    where F: FnOnce(Option<*mut c_void>) -> Option<*mut c_void> + Sized
+where
+    F: FnOnce(Option<*mut c_void>) -> Option<*mut c_void> + Sized,
 {
     extern "C" fn coroutine_function(mut t: Transfer) {
         unsafe {
@@ -63,7 +64,7 @@ impl<F> Coroutine<F>
                         Some(scheduler) => {
                             (*scheduler).try_schedule();
                         }
-                        None => thread::yield_now()
+                        None => thread::yield_now(),
                     }
                     continue;
                 }
@@ -71,15 +72,22 @@ impl<F> Coroutine<F>
                 (*context).status = Status::Running;
                 let param = (*context).param as Option<*mut c_void>;
                 match param {
-                    Some(data) => { print!("coroutine_function {} => ", data as usize) }
-                    None => { print!("coroutine_function no param => ") }
+                    Some(data) => {
+                        print!("coroutine_function {} => ", data as usize)
+                    }
+                    None => {
+                        print!("coroutine_function no param => ")
+                    }
                 }
                 //调用用户函数
                 let result = (*context).invoke();
                 match (*context).next {
                     Some(pointer) => {
                         //不回跳，继续执行下一个指定的协程
-                        let next = pointer as *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>;
+                        let next = pointer
+                            as *mut Coroutine<
+                                dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>,
+                            >;
                         std::mem::forget((*next).resume());
                     }
                     None => {
@@ -102,8 +110,13 @@ impl<F> Coroutine<F>
                 let func = ptr::read_unaligned((*context).proc.as_ref());
                 let mut new_context = Coroutine::init(
                     //设置协程状态为已完成，resume的时候，已经调用完了用户函数
-                    (*context).id, (*context).stack, Status::Finished,
-                    Box::new(func), param, None);
+                    (*context).id,
+                    (*context).stack,
+                    Status::Finished,
+                    Box::new(func),
+                    param,
+                    None,
+                );
                 new_context.set_result(result);
                 t = t.resume(&mut new_context as *mut Coroutine<F> as *mut c_void);
             }
@@ -111,15 +124,25 @@ impl<F> Coroutine<F>
     }
 
     pub fn new(size: usize, proc: F, param: Option<*mut c_void>) -> Self {
-        let stack = memory_pool::allocate(size)
-            .expect("allocate stack failed !");
-        Coroutine::init(IdGenerator::next_id("coroutine"), stack,
-                        Status::Created, Box::new(proc), param, None)
+        let stack = memory_pool::allocate(size).expect("allocate stack failed !");
+        Coroutine::init(
+            IdGenerator::next_id("coroutine"),
+            stack,
+            Status::Created,
+            Box::new(proc),
+            param,
+            None,
+        )
     }
 
-    fn init(id: usize, stack: ManuallyDrop<Memory>,
-            status: Status, proc: Box<F>, param: Option<*mut c_void>,
-            next: Option<*mut c_void>) -> Self {
+    fn init(
+        id: usize,
+        stack: ManuallyDrop<Memory>,
+        status: Status,
+        proc: Box<F>,
+        param: Option<*mut c_void>,
+        next: Option<*mut c_void>,
+    ) -> Self {
         let inner = Context::new(stack, Coroutine::<F>::coroutine_function);
         // Allocate a Context on the stack.
         let sp = Transfer::new(inner, ptr::null_mut());
@@ -165,7 +188,10 @@ impl<F: ?Sized> Coroutine<F> {
         self.switch(&self.sp)
     }
 
-    pub fn resume_to(&self, to: &Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) -> Self {
+    pub fn resume_to(
+        &self,
+        to: &Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>,
+    ) -> Self {
         self.switch(&to.sp)
     }
 
@@ -176,9 +202,7 @@ impl<F: ?Sized> Coroutine<F> {
     }
 
     pub fn delay(&mut self, delay: Duration) -> Self {
-        self.set_delay(delay)
-            .set_status(Status::Suspend)
-            .resume()
+        self.set_delay(delay).set_status(Status::Suspend).resume()
     }
 
     pub fn delay_with(&mut self, delay: Duration, param: Option<*mut c_void>) -> Self {
@@ -267,7 +291,10 @@ impl<F: ?Sized> Coroutine<F> {
         unsafe { (*context).next }
     }
 
-    pub fn set_next(&mut self, next: &mut Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void> + ?Sized>) -> &mut Self {
+    pub fn set_next(
+        &mut self,
+        next: &mut Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void> + ?Sized>,
+    ) -> &mut Self {
         let pointer = next as *mut _ as *mut c_void;
         self.set_next_ptr(pointer)
     }
@@ -291,7 +318,10 @@ impl<F: ?Sized> Coroutine<F> {
     }
 
     #[allow(unused)]
-    pub(crate) fn set_entrance(&mut self, entrance: &Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void> + ?Sized>) -> &mut Self {
+    pub(crate) fn set_entrance(
+        &mut self,
+        entrance: &Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void> + ?Sized>,
+    ) -> &mut Self {
         unsafe {
             let mut entrance = ptr::read_unaligned(entrance.sp.context.0);
             let pointer = &mut entrance as *mut c_void;
@@ -315,30 +345,38 @@ impl<F: ?Sized> Coroutine<F> {
 
 #[cfg(test)]
 mod tests {
+    use crate::coroutine::Coroutine;
     use std::os::raw::c_void;
     use std::time::Duration;
-    use crate::coroutine::Coroutine;
 
     #[test]
     fn test() {
         println!("context test started !");
-        let mut c = Coroutine::new(2048, |param| {
-            match param {
-                Some(param) => {
-                    print!("user_function {} => ", param as usize);
+        let mut c = Coroutine::new(
+            2048,
+            |param| {
+                match param {
+                    Some(param) => {
+                        print!("user_function {} => ", param as usize);
+                    }
+                    None => {
+                        print!("user_function no param => ");
+                    }
                 }
-                None => {
-                    print!("user_function no param => ");
-                }
-            }
-            param
-        }, None);
+                param
+            },
+            None,
+        );
         for i in 0..10 {
             print!("Resuming {} => ", i);
             c = c.delay_with(Duration::from_millis(100), Some(i as *mut c_void));
             match c.get_result() {
-                Some(result) => { println!("Got {}", result as usize) }
-                None => { println!("No result") }
+                Some(result) => {
+                    println!("Got {}", result as usize)
+                }
+                None => {
+                    println!("No result")
+                }
             }
         }
         c.exit();
@@ -347,18 +385,30 @@ mod tests {
 
     #[test]
     fn next() {
-        let mut head = Coroutine::new(2048, |param| {
-            println!("1");
-            param
-        }, None);
-        let mut middle = Coroutine::new(2048, |param| {
-            println!("2");
-            param
-        }, None);
-        let mut tail = Coroutine::new(2048, |param| {
-            println!("3");
-            param
-        }, None);
+        let mut head = Coroutine::new(
+            2048,
+            |param| {
+                println!("1");
+                param
+            },
+            None,
+        );
+        let mut middle = Coroutine::new(
+            2048,
+            |param| {
+                println!("2");
+                param
+            },
+            None,
+        );
+        let mut tail = Coroutine::new(
+            2048,
+            |param| {
+                println!("3");
+                param
+            },
+            None,
+        );
         head.set_next(&mut middle);
         middle.set_next(&mut tail);
 

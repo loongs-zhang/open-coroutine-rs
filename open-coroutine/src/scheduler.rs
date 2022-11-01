@@ -1,16 +1,15 @@
+use crate::coroutine::{Coroutine, Status};
+use id_generator::IdGenerator;
+use object_list::ObjectList;
+use once_cell::sync::Lazy;
 use std::mem::ManuallyDrop;
 use std::os::raw::c_void;
 use std::ptr;
 use std::time::Duration;
-use once_cell::sync::Lazy;
-use id_generator::IdGenerator;
-use object_list::ObjectList;
 use timer::TimerList;
-use crate::coroutine::{Coroutine, Status};
 
-static mut GLOBAL: Lazy<ManuallyDrop<Scheduler>> = Lazy::new(|| {
-    ManuallyDrop::new(Scheduler::new())
-});
+static mut GLOBAL: Lazy<ManuallyDrop<Scheduler>> =
+    Lazy::new(|| ManuallyDrop::new(Scheduler::new()));
 
 thread_local! {
     static SCHEDULER: Box<Scheduler> = Box::new(Scheduler::new());
@@ -62,17 +61,17 @@ impl Scheduler {
     }
 
     pub fn current<'a>() -> &'a mut Scheduler {
-        SCHEDULER.with(|boxed| {
-            Box::leak(unsafe { ptr::read_unaligned(boxed) })
-        })
+        SCHEDULER.with(|boxed| Box::leak(unsafe { ptr::read_unaligned(boxed) }))
     }
 
-    pub fn submit(&mut self, mut coroutine: Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
+    pub fn submit(
+        &mut self,
+        mut coroutine: Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>,
+    ) {
         let time = coroutine.get_execute_time();
         coroutine.set_scheduler(self);
         if timer::now() < time {
-            coroutine.set_execute_time(time)
-                .set_status(Status::Suspend);
+            coroutine.set_execute_time(time).set_status(Status::Suspend);
             self.suspend.insert(time, coroutine);
             return;
         }
@@ -80,7 +79,10 @@ impl Scheduler {
         self.ready.push_back(coroutine);
     }
 
-    pub fn execute(&mut self, mut coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
+    pub fn execute(
+        &mut self,
+        mut coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>,
+    ) {
         let time = coroutine.get_execute_time();
         if timer::now() < time {
             self.execute_at(time, coroutine);
@@ -91,14 +93,21 @@ impl Scheduler {
         self.ready.push_back(coroutine);
     }
 
-    pub fn delay(&mut self, delay: Duration, coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
+    pub fn delay(
+        &mut self,
+        delay: Duration,
+        coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>,
+    ) {
         let time = timer::get_timeout_time(delay);
         self.execute_at(time, coroutine)
     }
 
-    pub fn execute_at(&mut self, time: u64, mut coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>) {
-        coroutine.set_execute_time(time)
-            .set_status(Status::Suspend);
+    pub fn execute_at(
+        &mut self,
+        time: u64,
+        mut coroutine: Coroutine<impl FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>,
+    ) {
+        coroutine.set_execute_time(time).set_status(Status::Suspend);
         coroutine.set_scheduler(self);
         self.suspend.insert(time, coroutine);
     }
@@ -127,14 +136,20 @@ impl Scheduler {
     fn mark_entrance(&mut self) {
         if let Some(front_pointer) = self.ready.front_mut_raw() {
             let front = unsafe {
-                ptr::read_unaligned(front_pointer as
-                    *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
+                ptr::read_unaligned(
+                    front_pointer
+                        as *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>,
+                )
             };
             if let Some(back_pointer) = self.ready.back_mut_raw() {
                 if front_pointer != back_pointer {
                     let mut back = unsafe {
-                        ptr::read_unaligned(back_pointer as
-                            *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
+                        ptr::read_unaligned(
+                            back_pointer
+                                as *mut Coroutine<
+                                    dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>,
+                                >,
+                        )
                     };
                     back.set_entrance(&front);
                     std::mem::forget(back);
@@ -149,8 +164,12 @@ impl Scheduler {
         for _ in 0..self.ready.len() {
             if let Some(pointer) = self.ready.pop_front_raw() {
                 let mut coroutine = unsafe {
-                    ptr::read_unaligned(pointer as
-                        *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
+                    ptr::read_unaligned(
+                        pointer
+                            as *mut Coroutine<
+                                dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>,
+                            >,
+                    )
                 };
                 //fixme 这里拿到的时间不对
                 let exec_time = coroutine.get_execute_time();
@@ -187,8 +206,12 @@ impl Scheduler {
                     for _ in 0..entry.len() {
                         if let Some(pointer) = entry.pop_front_raw() {
                             unsafe {
-                                let mut coroutine = ptr::read_unaligned(pointer as
-                                    *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>);
+                                let mut coroutine = ptr::read_unaligned(
+                                    pointer
+                                        as *mut Coroutine<
+                                            dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>,
+                                        >,
+                                );
                                 coroutine.set_status(Status::Ready);
                                 self.ready.push_back(coroutine)
                             }
@@ -222,58 +245,70 @@ impl Scheduler {
 
 #[cfg(test)]
 mod tests {
+    use crate::coroutine::Coroutine;
+    use crate::scheduler::Scheduler;
     use std::os::raw::c_void;
     use std::thread;
     use std::time::Duration;
-    use crate::coroutine::Coroutine;
-    use crate::scheduler::Scheduler;
 
     #[test]
     fn simple() {
         let x = 1;
         let y = 2;
         let mut scheduler = Scheduler::new();
-        scheduler.execute(Coroutine::new(2048, |param| {
-            print!("env {} ", x);
-            match param {
-                Some(param) => {
-                    println!("coroutine1 {}", param as usize);
+        scheduler.execute(Coroutine::new(
+            2048,
+            |param| {
+                print!("env {} ", x);
+                match param {
+                    Some(param) => {
+                        println!("coroutine1 {}", param as usize);
+                    }
+                    None => {
+                        println!("coroutine1 no param");
+                    }
                 }
-                None => {
-                    println!("coroutine1 no param");
+                param
+            },
+            Some(1usize as *mut c_void),
+        ));
+        scheduler.execute(Coroutine::new(
+            2048,
+            |param| {
+                print!("env {} ", y);
+                match param {
+                    Some(param) => {
+                        println!("coroutine2 {}", param as usize);
+                    }
+                    None => {
+                        println!("coroutine2 no param");
+                    }
                 }
-            }
-            param
-        }, Some(1usize as *mut c_void)));
-        scheduler.execute(Coroutine::new(2048, |param| {
-            print!("env {} ", y);
-            match param {
-                Some(param) => {
-                    println!("coroutine2 {}", param as usize);
-                }
-                None => {
-                    println!("coroutine2 no param");
-                }
-            }
-            param
-        }, Some(2usize as *mut c_void)));
+                param
+            },
+            Some(2usize as *mut c_void),
+        ));
         scheduler.try_schedule();
     }
 
     #[test]
     fn test() {
         let mut scheduler = Scheduler::new();
-        let coroutine = Coroutine::new(2048, |param| {
-            match param {
-                Some(param) => {
-                    println!("user_function1 {}", param as usize);
+        let coroutine = Coroutine::new(
+            2048,
+            |param| {
+                match param {
+                    Some(param) => {
+                        println!("user_function1 {}", param as usize);
+                    }
+                    None => {
+                        println!("user_function1 no param");
+                    }
                 }
-                None => {
-                    println!("user_function1 no param");
-                }
-            }
-            param
-        }, Some(1usize as *mut c_void));
+                param
+            },
+            Some(1usize as *mut c_void),
+        );
         scheduler.delay(Duration::from_millis(500), coroutine);
         assert_eq!(0, scheduler.try_schedule().len());
         assert_eq!(0, scheduler.ready.len());
@@ -281,17 +316,21 @@ mod tests {
         let entry = scheduler.suspend.front().unwrap();
         assert_eq!(1, entry.len());
 
-        scheduler.execute(Coroutine::new(2048, |param| {
-            match param {
-                Some(param) => {
-                    println!("user_function2 {}", param as usize);
+        scheduler.execute(Coroutine::new(
+            2048,
+            |param| {
+                match param {
+                    Some(param) => {
+                        println!("user_function2 {}", param as usize);
+                    }
+                    None => {
+                        println!("user_function2 no param");
+                    }
                 }
-                None => {
-                    println!("user_function2 no param");
-                }
-            }
-            param
-        }, Some(2usize as *mut c_void)));
+                param
+            },
+            Some(2usize as *mut c_void),
+        ));
         assert_eq!(1, scheduler.try_schedule().len());
 
         //往下睡500+ms，才会轮询到
@@ -304,24 +343,39 @@ mod tests {
     #[test]
     fn schedule() {
         let mut scheduler = Scheduler::new();
-        scheduler.delay(Duration::from_millis(500), Coroutine::new(2048, |param| {
-            println!("coroutine1");
-            param
-        }, None));
-        scheduler.execute(Coroutine::new(2048, |param| {
-            println!("coroutine2");
-            param
-        }, None));
+        scheduler.delay(
+            Duration::from_millis(500),
+            Coroutine::new(
+                2048,
+                |param| {
+                    println!("coroutine1");
+                    param
+                },
+                None,
+            ),
+        );
+        scheduler.execute(Coroutine::new(
+            2048,
+            |param| {
+                println!("coroutine2");
+                param
+            },
+            None,
+        ));
         assert_eq!(2, scheduler.schedule().len());
     }
 
     #[test]
     fn delay() {
         let mut scheduler = Scheduler::new();
-        let mut coroutine = Coroutine::new(2048, |param| {
-            println!("coroutine1");
-            param
-        }, None);
+        let mut coroutine = Coroutine::new(
+            2048,
+            |param| {
+                println!("coroutine1");
+                param
+            },
+            None,
+        );
         coroutine.set_delay(Duration::from_millis(500));
         scheduler.execute(coroutine);
         assert_eq!(0, scheduler.try_schedule().len());
@@ -330,28 +384,43 @@ mod tests {
     #[test]
     fn try_schedule() {
         let mut scheduler = Scheduler::new();
-        scheduler.delay(Duration::from_millis(500), Coroutine::new(2048, |param| {
-            println!("coroutine1");
-            param
-        }, None));
+        scheduler.delay(
+            Duration::from_millis(500),
+            Coroutine::new(
+                2048,
+                |param| {
+                    println!("coroutine1");
+                    param
+                },
+                None,
+            ),
+        );
         assert_eq!(0, scheduler.try_schedule().len());
     }
 
     #[test]
     fn schedule_with_timeout() {
         let mut scheduler = Scheduler::new();
-        scheduler.delay(Duration::from_millis(500), Coroutine::new(2048, |param| {
-            param
-        }, None));
-        assert_eq!(0, scheduler.try_timed_schedule(Duration::from_millis(10)).len());
+        scheduler.delay(
+            Duration::from_millis(500),
+            Coroutine::new(2048, |param| param, None),
+        );
+        assert_eq!(
+            0,
+            scheduler
+                .try_timed_schedule(Duration::from_millis(10))
+                .len()
+        );
     }
 
     #[test]
     fn global() {
         let scheduler1 = Scheduler::global();
-        scheduler1.execute(Coroutine::new(2048, |param| {
-            param
-        }, Some(2usize as *mut c_void)));
+        scheduler1.execute(Coroutine::new(
+            2048,
+            |param| param,
+            Some(2usize as *mut c_void),
+        ));
         let scheduler2 = Scheduler::global();
         assert_eq!(scheduler1, scheduler2);
     }
@@ -359,9 +428,11 @@ mod tests {
     #[test]
     fn current() {
         let scheduler1 = Scheduler::current();
-        scheduler1.execute(Coroutine::new(2048, |param| {
-            param
-        }, Some(2usize as *mut c_void)));
+        scheduler1.execute(Coroutine::new(
+            2048,
+            |param| param,
+            Some(2usize as *mut c_void),
+        ));
         let scheduler2 = Scheduler::current();
         assert_eq!(scheduler1, scheduler2);
     }

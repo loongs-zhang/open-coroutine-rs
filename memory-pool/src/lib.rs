@@ -4,30 +4,25 @@ pub mod memory;
 
 mod system;
 
-use std::mem::ManuallyDrop;
-use std::sync::RwLock;
-use std::collections::HashMap;
-use std::ptr::NonNull;
-use once_cell::sync::Lazy;
 use crate::memory::{Memory, MemoryError};
 use crate::pool::SizedMemoryPool;
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
+use std::mem::ManuallyDrop;
+use std::ptr::NonNull;
+use std::sync::RwLock;
 
-static mut MEMORY_POOL: Lazy<RwLock<HashMap<usize, SizedMemoryPool>>> = Lazy::new(|| {
-    RwLock::new(HashMap::new())
-});
+static mut MEMORY_POOL: Lazy<RwLock<HashMap<usize, SizedMemoryPool>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 pub fn get_memory_pool(size: usize) -> Option<NonNull<SizedMemoryPool>> {
     unsafe {
         match MEMORY_POOL.write() {
-            Ok(mut map) => {
-                match map.get_mut(&size) {
-                    Some(pool) => {
-                        NonNull::new(pool as *mut _ as *mut SizedMemoryPool)
-                    }
-                    None => None
-                }
-            }
-            Err(_) => None
+            Ok(mut map) => match map.get_mut(&size) {
+                Some(pool) => NonNull::new(pool as *mut _ as *mut SizedMemoryPool),
+                None => None,
+            },
+            Err(_) => None,
         }
     }
 }
@@ -35,18 +30,14 @@ pub fn get_memory_pool(size: usize) -> Option<NonNull<SizedMemoryPool>> {
 pub fn allocate(size: usize) -> Result<ManuallyDrop<Memory>, MemoryError> {
     unsafe {
         match MEMORY_POOL.write() {
-            Ok(mut map) => {
-                match map.get_mut(&size) {
-                    Some(pool) => {
-                        pool.allocate()
-                    }
-                    None => {
-                        map.insert(size, SizedMemoryPool::new(size));
-                        map.get_mut(&size).unwrap().allocate()
-                    }
+            Ok(mut map) => match map.get_mut(&size) {
+                Some(pool) => pool.allocate(),
+                None => {
+                    map.insert(size, SizedMemoryPool::new(size));
+                    map.get_mut(&size).unwrap().allocate()
                 }
-            }
-            Err(_) => allocate(size)
+            },
+            Err(_) => allocate(size),
         }
     }
 }
@@ -59,7 +50,7 @@ pub fn revert(stack: ManuallyDrop<Memory>) {
                     pool.revert(stack);
                 }
             }
-            Err(_) => revert(stack)
+            Err(_) => revert(stack),
         }
     }
 }
@@ -72,7 +63,7 @@ pub fn drop(stack: ManuallyDrop<Memory>) {
                     pool.drop(stack);
                 }
             }
-            Err(_) => drop(stack)
+            Err(_) => drop(stack),
         }
     }
 }
@@ -83,8 +74,8 @@ pub fn default() -> Result<ManuallyDrop<Memory>, MemoryError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{allocate, get_memory_pool, MEMORY_POOL, revert};
     use crate::system;
+    use crate::{allocate, get_memory_pool, revert, MEMORY_POOL};
 
     #[test]
     fn test_memory_pool() {

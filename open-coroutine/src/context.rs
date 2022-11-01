@@ -1,8 +1,8 @@
 use core::fmt;
+use memory_pool::memory::Memory;
 use std::fmt::{Debug, Formatter};
 use std::mem::ManuallyDrop;
 use std::os::raw::c_void;
-use memory_pool::memory::Memory;
 
 /// A `Context` stores a `ContextFn`'s state of execution, for it to be resumed later.
 ///
@@ -94,10 +94,7 @@ impl Transfer {
     /// Returns a new `Transfer` struct with the members set to their respective arguments.
     #[inline(always)]
     pub fn new(context: Context, data: *mut c_void) -> Transfer {
-        Transfer {
-            context,
-            data,
-        }
+        Transfer { context, data }
     }
 
     pub fn resume(self, data: *mut c_void) -> Transfer {
@@ -155,10 +152,10 @@ extern "C" {
 
 #[cfg(test)]
 mod tests {
+    use crate::context::{Context, Transfer};
+    use memory_pool::memory::Memory;
     use std::mem::ManuallyDrop;
     use std::os::raw::c_void;
-    use memory_pool::memory::Memory;
-    use crate::context::{Context, Transfer};
 
     // This method will always `resume()` immediately back to the
     // previous `Context` with a `data` value of the next number in the fibonacci sequence.

@@ -1,15 +1,21 @@
-use std::os::raw::c_void;
-use std::ptr;
-use std::time::Duration;
 use object_list::ObjectList;
 use open_coroutine::coroutine::Coroutine;
 use open_coroutine::scheduler::Scheduler;
+use std::os::raw::c_void;
+use std::ptr;
+use std::time::Duration;
 
 //被hook的系统函数
 #[no_mangle]
 pub extern "C" fn sleep(secs: libc::c_uint) -> libc::c_uint {
-    let rqtp = libc::timespec { tv_sec: secs as i64, tv_nsec: 0 };
-    let mut rmtp = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+    let rqtp = libc::timespec {
+        tv_sec: secs as i64,
+        tv_nsec: 0,
+    };
+    let mut rmtp = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
     nanosleep(&rqtp, &mut rmtp);
     rmtp.tv_sec as u32
 }
@@ -19,8 +25,14 @@ pub fn usleep(secs: libc::c_uint) -> libc::c_int {
     let secs = secs as i64;
     let sec = secs / 1000_000;
     let nsec = (secs - sec * 1000_000) * 1000;
-    let rqtp = libc::timespec { tv_sec: sec, tv_nsec: nsec };
-    let mut rmtp = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+    let rqtp = libc::timespec {
+        tv_sec: sec,
+        tv_nsec: nsec,
+    };
+    let mut rmtp = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
     nanosleep(&rqtp, &mut rmtp)
 }
 
@@ -43,11 +55,16 @@ pub fn nanosleep(rqtp: *const libc::timespec, rmtp: *mut libc::timespec) -> libc
     }
     let sec = left_time / 1000_000_000;
     let nsec = left_time - sec * 1000_000_000;
-    let rqtp = libc::timespec { tv_sec: sec, tv_nsec: nsec };
+    let rqtp = libc::timespec {
+        tv_sec: sec,
+        tv_nsec: nsec,
+    };
     unsafe {
         //获取原始系统函数nanosleep，后续需要抽成单独的方法
-        let original = std::mem::transmute::<_, extern "C" fn(*const libc::timespec, *mut libc::timespec) -> libc::c_int>
-            (libc::dlsym(libc::RTLD_NEXT, "nanosleep".as_ptr() as _));
+        let original = std::mem::transmute::<
+            _,
+            extern "C" fn(*const libc::timespec, *mut libc::timespec) -> libc::c_int,
+        >(libc::dlsym(libc::RTLD_NEXT, "nanosleep".as_ptr() as _));
         //相当于libc::nanosleep(&rqtp, rmtp)
         original(&rqtp, rmtp)
     }
@@ -57,8 +74,9 @@ pub fn nanosleep(rqtp: *const libc::timespec, rmtp: *mut libc::timespec) -> libc
 #[no_mangle]
 pub extern "C" fn coroutine_crate(pointer: *mut c_void) {
     let coroutine = unsafe {
-        ptr::read_unaligned(pointer as
-            *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>)
+        ptr::read_unaligned(
+            pointer as *mut Coroutine<dyn FnOnce(Option<*mut c_void>) -> Option<*mut c_void>>,
+        )
     };
     Scheduler::current().submit(coroutine)
 }

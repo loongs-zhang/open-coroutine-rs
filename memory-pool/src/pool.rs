@@ -1,8 +1,8 @@
-use std::collections::VecDeque;
-use std::mem::ManuallyDrop;
-use crossbeam_deque::Worker;
 use crate::memory::{Memory, MemoryError};
 use crate::system;
+use crossbeam_deque::Worker;
+use std::collections::VecDeque;
+use std::mem::ManuallyDrop;
 
 #[derive(Debug)]
 pub struct SizedMemoryPool {
@@ -38,7 +38,7 @@ impl SizedMemoryPool {
                 self.using.push_back(available);
                 Ok(available)
             }
-            None => self.allocate()
+            None => self.allocate(),
         }
     }
 
@@ -79,12 +79,11 @@ impl Default for SizedMemoryPool {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::ptr;
-    use crate::system;
     use crate::pool::SizedMemoryPool;
+    use crate::system;
+    use std::ptr;
 
     #[test]
     fn test_sized_memory_pool() {

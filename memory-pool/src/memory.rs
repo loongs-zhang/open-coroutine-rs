@@ -26,7 +26,11 @@ impl Display for MemoryError {
     fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
         match *self {
             MemoryError::ExceedsMaximumSize(size) => {
-                write!(fmt, "Requested more than max size of {} bytes for a stack", size)
+                write!(
+                    fmt,
+                    "Requested more than max size of {} bytes for a stack",
+                    size
+                )
             }
             MemoryError::IoError(ref e) => e.fmt(fmt),
         }
@@ -37,9 +41,10 @@ impl Error for MemoryError {
     fn description(&self) -> &str {
         match *self {
             MemoryError::ExceedsMaximumSize(_) => "exceeds maximum stack size",
-            MemoryError::IoError(ref e) => {
+            MemoryError::IoError(ref e) =>
+            {
                 #[allow(deprecated)]
-                    e.description()
+                e.description()
             }
         }
     }
@@ -104,9 +109,7 @@ impl Memory {
     /// It is unsafe because it is your reponsibility to make sure that `top` and `buttom` are valid
     /// addresses.
     #[inline]
-    pub(crate) unsafe fn init(top: *mut c_void,
-                              bottom: *mut c_void,
-                              protected: bool) -> Memory {
+    pub(crate) unsafe fn init(top: *mut c_void, bottom: *mut c_void, protected: bool) -> Memory {
         debug_assert!(top >= bottom);
         Memory {
             top,
@@ -173,7 +176,9 @@ impl Memory {
             ptr = (self.bottom() as usize - page_size) as *mut c_void;
             size = self.len() + page_size;
         }
-        unsafe { system::deallocate(ptr, size); }
+        unsafe {
+            system::deallocate(ptr, size);
+        }
     }
 }
 
@@ -181,9 +186,8 @@ unsafe impl Send for Memory {}
 
 impl Default for Memory {
     fn default() -> Self {
-        Memory::new(system::default_size(true)).unwrap_or_else(|err| {
-            panic!("Failed to allocate Memory with {:?}", err)
-        })
+        Memory::new(system::default_size(true))
+            .unwrap_or_else(|err| panic!("Failed to allocate Memory with {:?}", err))
     }
 }
 

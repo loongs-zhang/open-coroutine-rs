@@ -1,7 +1,7 @@
+use crossbeam_deque::{Steal, Worker};
 use std::collections::VecDeque;
 use std::os::raw::c_void;
 use std::ptr;
-use crossbeam_deque::{Steal, Worker};
 
 #[repr(C)]
 #[derive(Debug, PartialEq, Eq)]
@@ -18,35 +18,35 @@ fn convert<T>(pointer: *mut c_void) -> Option<T> {
 
 impl ObjectList {
     pub fn new() -> Self {
-        ObjectList { inner: VecDeque::new() }
+        ObjectList {
+            inner: VecDeque::new(),
+        }
     }
 
     pub fn front<T>(&mut self) -> Option<&T> {
         match self.inner.front() {
-            Some(value) => {
-                unsafe {
-                    let result = ptr::read_unaligned(value) as *mut T;
-                    Some(&*result)
-                }
-            }
-            None => None
+            Some(value) => unsafe {
+                let result = ptr::read_unaligned(value) as *mut T;
+                Some(&*result)
+            },
+            None => None,
         }
     }
 
     pub fn front_mut<T>(&mut self) -> Option<&mut T> {
         match self.inner.front_mut() {
-            Some(value) => {
-                unsafe {
-                    let result = ptr::read_unaligned(value) as *mut T;
-                    Some(&mut *result)
-                }
-            }
-            None => None
+            Some(value) => unsafe {
+                let result = ptr::read_unaligned(value) as *mut T;
+                Some(&mut *result)
+            },
+            None => None,
         }
     }
 
     pub fn front_mut_raw(&mut self) -> Option<*mut c_void> {
-        self.inner.front_mut().map(|value| unsafe { ptr::read_unaligned(value) })
+        self.inner
+            .front_mut()
+            .map(|value| unsafe { ptr::read_unaligned(value) })
     }
 
     pub fn push_front<T>(&mut self, element: T) {
@@ -60,10 +60,8 @@ impl ObjectList {
 
     pub fn pop_front<T>(&mut self) -> Option<T> {
         match self.inner.pop_front() {
-            Some(pointer) => {
-                convert(pointer)
-            }
-            None => None
+            Some(pointer) => convert(pointer),
+            None => None,
         }
     }
 
@@ -74,30 +72,28 @@ impl ObjectList {
 
     pub fn back<T>(&mut self) -> Option<&T> {
         match self.inner.back() {
-            Some(value) => {
-                unsafe {
-                    let result = ptr::read_unaligned(value) as *mut T;
-                    Some(&*result)
-                }
-            }
-            None => None
+            Some(value) => unsafe {
+                let result = ptr::read_unaligned(value) as *mut T;
+                Some(&*result)
+            },
+            None => None,
         }
     }
 
     pub fn back_mut<T>(&mut self) -> Option<&mut T> {
         match self.inner.back_mut() {
-            Some(value) => {
-                unsafe {
-                    let result = ptr::read_unaligned(value) as *mut T;
-                    Some(&mut *result)
-                }
-            }
-            None => None
+            Some(value) => unsafe {
+                let result = ptr::read_unaligned(value) as *mut T;
+                Some(&mut *result)
+            },
+            None => None,
         }
     }
 
     pub fn back_mut_raw(&mut self) -> Option<*mut c_void> {
-        self.inner.back_mut().map(|value| unsafe { ptr::read_unaligned(value) })
+        self.inner
+            .back_mut()
+            .map(|value| unsafe { ptr::read_unaligned(value) })
     }
 
     pub fn push_back<T>(&mut self, element: T) {
@@ -111,10 +107,8 @@ impl ObjectList {
 
     pub fn pop_back<T>(&mut self) -> Option<T> {
         match self.inner.pop_back() {
-            Some(pointer) => {
-                convert(pointer)
-            }
-            None => None
+            Some(pointer) => convert(pointer),
+            None => None,
         }
     }
 
@@ -129,30 +123,28 @@ impl ObjectList {
 
     pub fn get<T>(&self, index: usize) -> Option<&T> {
         match self.inner.get(index) {
-            Some(val) => {
-                unsafe {
-                    let result = ptr::read_unaligned(val) as *mut T;
-                    Some(&*result)
-                }
-            }
-            None => None
+            Some(val) => unsafe {
+                let result = ptr::read_unaligned(val) as *mut T;
+                Some(&*result)
+            },
+            None => None,
         }
     }
 
     pub fn get_mut<T>(&mut self, index: usize) -> Option<&mut T> {
         match self.inner.get_mut(index) {
-            Some(val) => {
-                unsafe {
-                    let result = ptr::read_unaligned(val) as *mut T;
-                    Some(&mut *result)
-                }
-            }
-            None => None
+            Some(val) => unsafe {
+                let result = ptr::read_unaligned(val) as *mut T;
+                Some(&mut *result)
+            },
+            None => None,
         }
     }
 
     pub fn get_mut_raw(&mut self, index: usize) -> Option<*mut c_void> {
-        self.inner.get_mut(index).map(|pointer| unsafe { ptr::read_unaligned(pointer) })
+        self.inner
+            .get_mut(index)
+            .map(|pointer| unsafe { ptr::read_unaligned(pointer) })
     }
 
     pub fn is_empty(&self) -> bool {
@@ -192,7 +184,9 @@ pub struct StealableObjectList {
 
 impl StealableObjectList {
     pub fn new() -> Self {
-        StealableObjectList { inner: Worker::new_fifo() }
+        StealableObjectList {
+            inner: Worker::new_fifo(),
+        }
     }
 
     pub fn push_back<T>(&mut self, element: T) {
@@ -202,10 +196,8 @@ impl StealableObjectList {
 
     pub fn pop_front<T>(&mut self) -> Option<T> {
         match self.inner.pop() {
-            Some(pointer) => {
-                convert(pointer)
-            }
-            None => None
+            Some(pointer) => convert(pointer),
+            None => None,
         }
     }
 

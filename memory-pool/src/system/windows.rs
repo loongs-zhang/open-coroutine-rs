@@ -26,7 +26,11 @@ pub unsafe fn allocate(size: usize) -> io::Result<Memory> {
     if ptr == NULL {
         Err(io::Error::last_os_error())
     } else {
-        Ok(Memory::init((ptr as usize + size) as *mut c_void, ptr as *mut c_void, false))
+        Ok(Memory::init(
+            (ptr as usize + size) as *mut c_void,
+            ptr as *mut c_void,
+            false,
+        ))
     }
 }
 

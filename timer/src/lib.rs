@@ -1,15 +1,17 @@
+use object_list::ObjectList;
 use std::collections::VecDeque;
 use std::os::raw::c_void;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use object_list::ObjectList;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 
 // get the current wall clock in ns
 #[inline]
 pub fn now() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH)
-        .expect("1970-01-01 00:00:00 UTC was {} seconds ago!").as_nanos() as u64
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("1970-01-01 00:00:00 UTC was {} seconds ago!")
+        .as_nanos() as u64
 }
 
 #[inline]
@@ -32,7 +34,10 @@ pub struct TimerEntry {
 
 impl TimerEntry {
     pub fn new(time: u64) -> Self {
-        TimerEntry { time, dequeue: ObjectList::new() }
+        TimerEntry {
+            time,
+            dequeue: ObjectList::new(),
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -78,7 +83,9 @@ impl TimerList {
     }
 
     pub fn insert<T>(&mut self, time: u64, t: T) {
-        let index = self.dequeue.binary_search_by(|x| x.time.cmp(&time))
+        let index = self
+            .dequeue
+            .binary_search_by(|x| x.time.cmp(&time))
             .unwrap_or_else(|x| x);
         match self.dequeue.get_mut(index) {
             Some(entry) => {

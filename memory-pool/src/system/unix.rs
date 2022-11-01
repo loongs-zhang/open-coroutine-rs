@@ -13,10 +13,20 @@ use std::usize;
 
 use crate::memory::Memory;
 
-#[cfg(any(target_os = "openbsd", target_os = "macos", target_os = "ios", target_os = "android"))]
+#[cfg(any(
+    target_os = "openbsd",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "android"
+))]
 const MAP_STACK: libc::c_int = 0;
 
-#[cfg(not(any(target_os = "openbsd", target_os = "macos", target_os = "ios", target_os = "android")))]
+#[cfg(not(any(
+    target_os = "openbsd",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "android"
+)))]
 const MAP_STACK: libc::c_int = libc::MAP_STACK;
 
 pub unsafe fn allocate(size: usize) -> io::Result<Memory> {
@@ -29,7 +39,11 @@ pub unsafe fn allocate(size: usize) -> io::Result<Memory> {
     if ptr == libc::MAP_FAILED {
         Err(io::Error::last_os_error())
     } else {
-        Ok(Memory::init((ptr as usize + size) as *mut c_void, ptr as *mut c_void, false))
+        Ok(Memory::init(
+            (ptr as usize + size) as *mut c_void,
+            ptr as *mut c_void,
+            false,
+        ))
     }
 }
 

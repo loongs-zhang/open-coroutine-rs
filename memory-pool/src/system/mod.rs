@@ -9,27 +9,13 @@
 mod unix;
 
 #[cfg(unix)]
-pub use self::unix::{
-    allocate,
-    deallocate,
-    max_size,
-    min_size,
-    page_size,
-    protect,
-};
+pub use self::unix::{allocate, deallocate, max_size, min_size, page_size, protect};
 
 #[cfg(windows)]
 mod windows;
 
 #[cfg(windows)]
-pub use self::windows::{
-    allocate,
-    deallocate,
-    max_size,
-    min_size,
-    page_size,
-    protect,
-};
+pub use self::windows::{allocate, deallocate, max_size, min_size, page_size, protect};
 
 pub fn default_size(protected: bool) -> usize {
     let size = self::min_size() * 8;
