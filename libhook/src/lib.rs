@@ -24,6 +24,7 @@ pub fn usleep(secs: libc::c_uint) -> libc::c_int {
     nanosleep(&rqtp, &mut rmtp)
 }
 
+#[allow(not_unsafe_ptr_arg_deref)]
 #[no_mangle]
 pub fn nanosleep(rqtp: *const libc::timespec, rmtp: *mut libc::timespec) -> libc::c_int {
     let nanos_time = unsafe { (*rqtp).tv_sec * 1000_000_000 + (*rqtp).tv_nsec } as u64;

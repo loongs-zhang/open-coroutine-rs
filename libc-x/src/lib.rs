@@ -9,7 +9,7 @@ pub fn co_crate<F>(size: usize, proc: F, param: Option<*mut c_void>) -> Coroutin
     where F: FnOnce(Option<*mut c_void>) -> Option<*mut c_void> + Sized
 {
     let mut co = Coroutine::new(size, proc, param);
-    unsafe { coroutine_crate(std::mem::transmute(&mut co)); }
+    unsafe { coroutine_crate(&mut co as *mut _ as *mut c_void); }
     co
 }
 
