@@ -1,23 +1,31 @@
 use std::os::raw::c_void;
+use open_coroutine::coroutine::Coroutine;
 
 extern "C" {
-    pub fn coroutine_crate(coroutine: *mut c_void);
+    fn coroutine_crate(coroutine: *mut c_void);
+}
+
+pub fn co_crate<F>(size: usize, proc: F, param: Option<*mut c_void>) -> Coroutine<F>
+    where F: FnOnce(Option<*mut c_void>) -> Option<*mut c_void> + Sized
+{
+    let mut co = Coroutine::new(size, proc, param);
+    unsafe { coroutine_crate(std::mem::transmute(&mut co)); }
+    co
 }
 
 #[cfg(test)]
 mod tests {
     use open_coroutine::coroutine::Coroutine;
-    use crate::coroutine_crate;
+    use crate::co_crate;
 
     #[test]
     fn test_sleep() {
         unsafe {
             let x = 10;
-            let mut co = Coroutine::new(2048, |param| {
+            let co = co_crate(2048, |param| {
                 println!("hello from coroutine {}", x);
                 param
             }, None);
-            coroutine_crate(std::mem::transmute(&mut co));
             libc::sleep(1);
         }
     }
