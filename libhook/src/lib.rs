@@ -23,8 +23,8 @@ pub extern "C" fn sleep(secs: libc::c_uint) -> libc::c_uint {
 #[no_mangle]
 pub fn usleep(secs: libc::c_uint) -> libc::c_int {
     let secs = secs as i64;
-    let sec = secs / 1000_000;
-    let nsec = (secs - sec * 1000_000) * 1000;
+    let sec = secs / 1_000_000;
+    let nsec = (secs - sec * 1_000_000) * 1000;
     let rqtp = libc::timespec {
         tv_sec: sec,
         tv_nsec: nsec,
@@ -36,10 +36,10 @@ pub fn usleep(secs: libc::c_uint) -> libc::c_int {
     nanosleep(&rqtp, &mut rmtp)
 }
 
-#[allow(not_unsafe_ptr_arg_deref)]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 #[no_mangle]
 pub fn nanosleep(rqtp: *const libc::timespec, rmtp: *mut libc::timespec) -> libc::c_int {
-    let nanos_time = unsafe { (*rqtp).tv_sec * 1000_000_000 + (*rqtp).tv_nsec } as u64;
+    let nanos_time = unsafe { (*rqtp).tv_sec * 1_000_000_000 + (*rqtp).tv_nsec } as u64;
     let timeout_time = timer::get_timeout_time(Duration::from_nanos(nanos_time));
     Scheduler::current().try_timed_schedule(Duration::from_nanos(nanos_time));
     // 可能schedule完还剩一些时间，此时本地队列没有任务可做
@@ -53,8 +53,8 @@ pub fn nanosleep(rqtp: *const libc::timespec, rmtp: *mut libc::timespec) -> libc
         }
         return 0;
     }
-    let sec = left_time / 1000_000_000;
-    let nsec = left_time - sec * 1000_000_000;
+    let sec = left_time / 1_000_000_000;
+    let nsec = left_time - sec * 1_000_000_000;
     let rqtp = libc::timespec {
         tv_sec: sec,
         tv_nsec: nsec,
