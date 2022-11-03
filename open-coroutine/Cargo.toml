@@ -8,7 +8,6 @@ memory-pool = { path = "../memory-pool" }
 object-list = { path = "../object-list" }
 timer = { path = "../timer" }
 id-generator = { path = "../id-generator" }
-libc = "0.2.119"
 once_cell = "1.13.0"
 
 [build-dependencies]
