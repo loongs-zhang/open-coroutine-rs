@@ -10,13 +10,14 @@ use std::time::Duration;
 epoll like
 fcntl由于最后一个参数的类型问题，不支持
 todo 待支持io_uring
-todo 待完善编译条件
  */
+#[cfg(unix)]
 #[no_mangle]
 pub fn poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: libc::c_int) -> libc::c_int {
     todo!()
 }
 
+#[cfg(unix)]
 #[no_mangle]
 pub fn select(
     nfds: libc::c_int,
@@ -28,7 +29,10 @@ pub fn select(
     todo!()
 }
 
-#[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos", target_os = "watchos"))]
+#[cfg(any(target_os = "macos",
+target_os = "ios",
+target_os = "tvos",
+target_os = "watchos"))]
 #[no_mangle]
 pub fn kevent(
     kq: libc::c_int,
@@ -41,7 +45,7 @@ pub fn kevent(
     todo!()
 }
 
-#[cfg(linux)]
+#[cfg(target_os = "linux")]
 #[no_mangle]
 pub fn epoll_wait(
     epfd: libc::c_int,
@@ -53,6 +57,7 @@ pub fn epoll_wait(
 }
 
 //socket相关
+#[cfg(unix)]
 #[no_mangle]
 pub fn setsockopt(
     socket: libc::c_int,
@@ -64,6 +69,7 @@ pub fn setsockopt(
     todo!()
 }
 
+#[cfg(unix)]
 #[no_mangle]
 pub fn accept(
     socket: libc::c_int,
@@ -74,6 +80,7 @@ pub fn accept(
     todo!()
 }
 
+#[cfg(unix)]
 #[no_mangle]
 pub fn connect(
     socket: libc::c_int,
@@ -84,22 +91,33 @@ pub fn connect(
     todo!()
 }
 
+#[cfg(unix)]
 #[no_mangle]
 pub fn close(fd: libc::c_int) -> libc::c_int {
     todo!()
 }
 
 //读数据
+#[cfg(unix)]
 #[no_mangle]
 pub fn read(fd: libc::c_int, buf: *mut libc::c_void, count: libc::size_t) -> libc::ssize_t {
     todo!()
 }
 
+#[cfg(any(target_os = "macos",
+target_os = "ios",
+target_os = "tvos",
+target_os = "watchos",
+target_os = "freebsd",
+target_os = "dragonfly",
+target_os = "openbsd",
+target_os = "netbsd"))]
 #[no_mangle]
 pub fn readv(fd: libc::c_int, iov: *const libc::iovec, iovcnt: libc::c_int) -> libc::ssize_t {
     todo!()
 }
 
+#[cfg(unix)]
 #[no_mangle]
 pub fn recv(
     socket: libc::c_int,
@@ -110,6 +128,14 @@ pub fn recv(
     todo!()
 }
 
+#[cfg(any(target_os = "macos",
+target_os = "ios",
+target_os = "tvos",
+target_os = "watchos",
+target_os = "freebsd",
+target_os = "dragonfly",
+target_os = "openbsd",
+target_os = "netbsd"))]
 #[no_mangle]
 pub fn recvfrom(
     socket: libc::c_int,
@@ -122,22 +148,40 @@ pub fn recvfrom(
     todo!()
 }
 
+#[cfg(any(target_os = "macos",
+target_os = "ios",
+target_os = "tvos",
+target_os = "watchos",
+target_os = "freebsd",
+target_os = "dragonfly",
+target_os = "openbsd",
+target_os = "netbsd"))]
 #[no_mangle]
 pub fn recvmsg(fd: libc::c_int, msg: *mut libc::msghdr, flags: libc::c_int) -> libc::ssize_t {
     todo!()
 }
 
 //写数据
+#[cfg(unix)]
 #[no_mangle]
 pub fn write(fd: libc::c_int, buf: *const libc::c_void, count: libc::size_t) -> libc::ssize_t {
     todo!()
 }
 
+#[cfg(any(target_os = "macos",
+target_os = "ios",
+target_os = "tvos",
+target_os = "watchos",
+target_os = "freebsd",
+target_os = "dragonfly",
+target_os = "openbsd",
+target_os = "netbsd"))]
 #[no_mangle]
 pub fn writev(fd: libc::c_int, iov: *const libc::iovec, iovcnt: libc::c_int) -> libc::ssize_t {
     todo!()
 }
 
+#[cfg(unix)]
 #[no_mangle]
 pub fn send(
     socket: libc::c_int,
@@ -148,6 +192,7 @@ pub fn send(
     todo!()
 }
 
+#[cfg(unix)]
 #[no_mangle]
 pub fn sendto(
     socket: libc::c_int,
@@ -160,12 +205,21 @@ pub fn sendto(
     todo!()
 }
 
+#[cfg(any(target_os = "macos",
+target_os = "ios",
+target_os = "tvos",
+target_os = "watchos",
+target_os = "freebsd",
+target_os = "dragonfly",
+target_os = "openbsd",
+target_os = "netbsd"))]
 #[no_mangle]
 pub fn sendmsg(fd: libc::c_int, msg: *const libc::msghdr, flags: libc::c_int) -> libc::ssize_t {
     todo!()
 }
 
 //sleep相关
+#[cfg(unix)]
 #[no_mangle]
 pub extern "C" fn sleep(secs: libc::c_uint) -> libc::c_uint {
     let rqtp = libc::timespec {
@@ -180,6 +234,7 @@ pub extern "C" fn sleep(secs: libc::c_uint) -> libc::c_uint {
     rmtp.tv_sec as u32
 }
 
+#[cfg(unix)]
 #[no_mangle]
 pub extern "C" fn usleep(secs: libc::c_uint) -> libc::c_int {
     let secs = secs as i64;
@@ -197,6 +252,7 @@ pub extern "C" fn usleep(secs: libc::c_uint) -> libc::c_int {
 }
 
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
+#[cfg(unix)]
 #[no_mangle]
 pub extern "C" fn nanosleep(rqtp: *const libc::timespec, rmtp: *mut libc::timespec) -> libc::c_int {
     let nanos_time = unsafe { (*rqtp).tv_sec * 1_000_000_000 + (*rqtp).tv_nsec } as u64;
