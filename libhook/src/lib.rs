@@ -11,11 +11,43 @@ epoll like
 fcntl由于最后一个参数的类型问题，不支持
 todo 待支持io_uring
  */
+
+static mut POLL: Option<
+    extern "C" fn(*mut libc::pollfd, libc::nfds_t, libc::c_int) -> libc::c_int,
+> = None;
+
 #[cfg(unix)]
 #[no_mangle]
 pub fn poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: libc::c_int) -> libc::c_int {
-    todo!()
+    //todo
+    //获取原始系统函数poll
+    let original = unsafe {
+        match POLL {
+            Some(original) => original,
+            None => {
+                let original =
+                    std::mem::transmute::<
+                        _,
+                        extern "C" fn(*mut libc::pollfd, libc::nfds_t, libc::c_int) -> libc::c_int,
+                    >(libc::dlsym(libc::RTLD_NEXT, "poll".as_ptr() as _));
+                POLL = Some(original);
+                original
+            }
+        }
+    };
+    //相当于libc::poll(fds, nfds, timeout)
+    original(fds, nfds, timeout)
 }
+
+static mut SELECT: Option<
+    extern "C" fn(
+        libc::c_int,
+        *mut libc::fd_set,
+        *mut libc::fd_set,
+        *mut libc::fd_set,
+        *mut libc::timeval,
+    ) -> libc::c_int,
+> = None;
 
 #[cfg(unix)]
 #[no_mangle]
@@ -26,197 +58,232 @@ pub fn select(
     errorfds: *mut libc::fd_set,
     timeout: *mut libc::timeval,
 ) -> libc::c_int {
-    todo!()
+    //todo
+    //获取原始系统函数select
+    let original = unsafe {
+        match SELECT {
+            Some(original) => original,
+            None => {
+                let original =
+                    std::mem::transmute::<
+                        _,
+                        extern "C" fn(
+                            libc::c_int,
+                            *mut libc::fd_set,
+                            *mut libc::fd_set,
+                            *mut libc::fd_set,
+                            *mut libc::timeval,
+                        ) -> libc::c_int,
+                    >(libc::dlsym(libc::RTLD_NEXT, "select".as_ptr() as _));
+                SELECT = Some(original);
+                original
+            }
+        }
+    };
+    //相当于libc::select(nfds,readfs,writefds,errorfds,timeout)
+    original(nfds, readfs, writefds, errorfds, timeout)
 }
 
-#[cfg(any(target_os = "macos",
-target_os = "ios",
-target_os = "tvos",
-target_os = "watchos"))]
-#[no_mangle]
-pub fn kevent(
-    kq: libc::c_int,
-    changelist: *const libc::kevent,
-    nchanges: libc::c_int,
-    eventlist: *mut libc::kevent,
-    nevents: libc::c_int,
-    timeout: *const libc::timespec,
-) -> libc::c_int {
-    todo!()
-}
-
-#[cfg(target_os = "linux")]
-#[no_mangle]
-pub fn epoll_wait(
-    epfd: libc::c_int,
-    events: *mut libc::epoll_event,
-    maxevents: libc::c_int,
-    timeout: libc::c_int,
-) -> libc::c_int {
-    todo!()
-}
-
-//socket相关
-#[cfg(unix)]
-#[no_mangle]
-pub fn setsockopt(
-    socket: libc::c_int,
-    level: libc::c_int,
-    name: libc::c_int,
-    value: *const libc::c_void,
-    option_len: libc::socklen_t,
-) -> libc::c_int {
-    todo!()
-}
-
-#[cfg(unix)]
-#[no_mangle]
-pub fn accept(
-    socket: libc::c_int,
-    address: *mut libc::sockaddr,
-    address_len: *mut libc::socklen_t,
-) -> libc::c_int {
-    //需要强制把socket设置为非阻塞
-    todo!()
-}
-
-#[cfg(unix)]
-#[no_mangle]
-pub fn connect(
-    socket: libc::c_int,
-    address: *const libc::sockaddr,
-    len: libc::socklen_t,
-) -> libc::c_int {
-    //需要强制把socket设置为非阻塞
-    todo!()
-}
-
-#[cfg(unix)]
-#[no_mangle]
-pub fn close(fd: libc::c_int) -> libc::c_int {
-    todo!()
-}
-
-//读数据
-#[cfg(unix)]
-#[no_mangle]
-pub fn read(fd: libc::c_int, buf: *mut libc::c_void, count: libc::size_t) -> libc::ssize_t {
-    todo!()
-}
-
-#[cfg(any(target_os = "macos",
-target_os = "ios",
-target_os = "tvos",
-target_os = "watchos",
-target_os = "freebsd",
-target_os = "dragonfly",
-target_os = "openbsd",
-target_os = "netbsd"))]
-#[no_mangle]
-pub fn readv(fd: libc::c_int, iov: *const libc::iovec, iovcnt: libc::c_int) -> libc::ssize_t {
-    todo!()
-}
-
-#[cfg(unix)]
-#[no_mangle]
-pub fn recv(
-    socket: libc::c_int,
-    buf: *mut libc::c_void,
-    len: libc::size_t,
-    flags: libc::c_int,
-) -> libc::ssize_t {
-    todo!()
-}
-
-#[cfg(any(target_os = "macos",
-target_os = "ios",
-target_os = "tvos",
-target_os = "watchos",
-target_os = "freebsd",
-target_os = "dragonfly",
-target_os = "openbsd",
-target_os = "netbsd"))]
-#[no_mangle]
-pub fn recvfrom(
-    socket: libc::c_int,
-    buf: *mut libc::c_void,
-    len: libc::size_t,
-    flags: libc::c_int,
-    addr: *mut libc::sockaddr,
-    addrlen: *mut libc::socklen_t,
-) -> libc::ssize_t {
-    todo!()
-}
-
-#[cfg(any(target_os = "macos",
-target_os = "ios",
-target_os = "tvos",
-target_os = "watchos",
-target_os = "freebsd",
-target_os = "dragonfly",
-target_os = "openbsd",
-target_os = "netbsd"))]
-#[no_mangle]
-pub fn recvmsg(fd: libc::c_int, msg: *mut libc::msghdr, flags: libc::c_int) -> libc::ssize_t {
-    todo!()
-}
-
-//写数据
-#[cfg(unix)]
-#[no_mangle]
-pub fn write(fd: libc::c_int, buf: *const libc::c_void, count: libc::size_t) -> libc::ssize_t {
-    todo!()
-}
-
-#[cfg(any(target_os = "macos",
-target_os = "ios",
-target_os = "tvos",
-target_os = "watchos",
-target_os = "freebsd",
-target_os = "dragonfly",
-target_os = "openbsd",
-target_os = "netbsd"))]
-#[no_mangle]
-pub fn writev(fd: libc::c_int, iov: *const libc::iovec, iovcnt: libc::c_int) -> libc::ssize_t {
-    todo!()
-}
-
-#[cfg(unix)]
-#[no_mangle]
-pub fn send(
-    socket: libc::c_int,
-    buf: *const libc::c_void,
-    len: libc::size_t,
-    flags: libc::c_int,
-) -> libc::ssize_t {
-    todo!()
-}
-
-#[cfg(unix)]
-#[no_mangle]
-pub fn sendto(
-    socket: libc::c_int,
-    buf: *const libc::c_void,
-    len: libc::size_t,
-    flags: libc::c_int,
-    addr: *const libc::sockaddr,
-    addrlen: libc::socklen_t,
-) -> libc::ssize_t {
-    todo!()
-}
-
-#[cfg(any(target_os = "macos",
-target_os = "ios",
-target_os = "tvos",
-target_os = "watchos",
-target_os = "freebsd",
-target_os = "dragonfly",
-target_os = "openbsd",
-target_os = "netbsd"))]
-#[no_mangle]
-pub fn sendmsg(fd: libc::c_int, msg: *const libc::msghdr, flags: libc::c_int) -> libc::ssize_t {
-    todo!()
-}
+// #[cfg(any(
+//     target_os = "macos",
+//     target_os = "ios",
+//     target_os = "tvos",
+//     target_os = "watchos"
+// ))]
+// #[no_mangle]
+// pub fn kevent(
+//     kq: libc::c_int,
+//     changelist: *const libc::kevent,
+//     nchanges: libc::c_int,
+//     eventlist: *mut libc::kevent,
+//     nevents: libc::c_int,
+//     timeout: *const libc::timespec,
+// ) -> libc::c_int {
+//     todo!()
+// }
+//
+// #[cfg(target_os = "linux")]
+// #[no_mangle]
+// pub fn epoll_wait(
+//     epfd: libc::c_int,
+//     events: *mut libc::epoll_event,
+//     maxevents: libc::c_int,
+//     timeout: libc::c_int,
+// ) -> libc::c_int {
+//     todo!()
+// }
+//
+// //socket相关
+// #[cfg(unix)]
+// #[no_mangle]
+// pub fn setsockopt(
+//     socket: libc::c_int,
+//     level: libc::c_int,
+//     name: libc::c_int,
+//     value: *const libc::c_void,
+//     option_len: libc::socklen_t,
+// ) -> libc::c_int {
+//     todo!()
+// }
+//
+// #[cfg(unix)]
+// #[no_mangle]
+// pub fn accept(
+//     socket: libc::c_int,
+//     address: *mut libc::sockaddr,
+//     address_len: *mut libc::socklen_t,
+// ) -> libc::c_int {
+//     //需要强制把socket设置为非阻塞
+//     todo!()
+// }
+//
+// #[cfg(unix)]
+// #[no_mangle]
+// pub fn connect(
+//     socket: libc::c_int,
+//     address: *const libc::sockaddr,
+//     len: libc::socklen_t,
+// ) -> libc::c_int {
+//     //需要强制把socket设置为非阻塞
+//     todo!()
+// }
+//
+// #[cfg(unix)]
+// #[no_mangle]
+// pub fn close(fd: libc::c_int) -> libc::c_int {
+//     todo!()
+// }
+//
+// //读数据
+// #[cfg(unix)]
+// #[no_mangle]
+// pub fn read(fd: libc::c_int, buf: *mut libc::c_void, count: libc::size_t) -> libc::ssize_t {
+//     todo!()
+// }
+//
+// #[cfg(any(
+//     target_os = "macos",
+//     target_os = "ios",
+//     target_os = "tvos",
+//     target_os = "watchos",
+//     target_os = "freebsd",
+//     target_os = "dragonfly",
+//     target_os = "openbsd",
+//     target_os = "netbsd"
+// ))]
+// #[no_mangle]
+// pub fn readv(fd: libc::c_int, iov: *const libc::iovec, iovcnt: libc::c_int) -> libc::ssize_t {
+//     todo!()
+// }
+//
+// #[cfg(unix)]
+// #[no_mangle]
+// pub fn recv(
+//     socket: libc::c_int,
+//     buf: *mut libc::c_void,
+//     len: libc::size_t,
+//     flags: libc::c_int,
+// ) -> libc::ssize_t {
+//     todo!()
+// }
+//
+// #[cfg(any(
+//     target_os = "macos",
+//     target_os = "ios",
+//     target_os = "tvos",
+//     target_os = "watchos",
+//     target_os = "freebsd",
+//     target_os = "dragonfly",
+//     target_os = "openbsd",
+//     target_os = "netbsd"
+// ))]
+// #[no_mangle]
+// pub fn recvfrom(
+//     socket: libc::c_int,
+//     buf: *mut libc::c_void,
+//     len: libc::size_t,
+//     flags: libc::c_int,
+//     addr: *mut libc::sockaddr,
+//     addrlen: *mut libc::socklen_t,
+// ) -> libc::ssize_t {
+//     todo!()
+// }
+//
+// #[cfg(any(
+//     target_os = "macos",
+//     target_os = "ios",
+//     target_os = "tvos",
+//     target_os = "watchos",
+//     target_os = "freebsd",
+//     target_os = "dragonfly",
+//     target_os = "openbsd",
+//     target_os = "netbsd"
+// ))]
+// #[no_mangle]
+// pub fn recvmsg(fd: libc::c_int, msg: *mut libc::msghdr, flags: libc::c_int) -> libc::ssize_t {
+//     todo!()
+// }
+//
+// //写数据
+// #[cfg(unix)]
+// #[no_mangle]
+// pub fn write(fd: libc::c_int, buf: *const libc::c_void, count: libc::size_t) -> libc::ssize_t {
+//     todo!()
+// }
+//
+// #[cfg(any(
+//     target_os = "macos",
+//     target_os = "ios",
+//     target_os = "tvos",
+//     target_os = "watchos",
+//     target_os = "freebsd",
+//     target_os = "dragonfly",
+//     target_os = "openbsd",
+//     target_os = "netbsd"
+// ))]
+// #[no_mangle]
+// pub fn writev(fd: libc::c_int, iov: *const libc::iovec, iovcnt: libc::c_int) -> libc::ssize_t {
+//     todo!()
+// }
+//
+// #[cfg(unix)]
+// #[no_mangle]
+// pub fn send(
+//     socket: libc::c_int,
+//     buf: *const libc::c_void,
+//     len: libc::size_t,
+//     flags: libc::c_int,
+// ) -> libc::ssize_t {
+//     todo!()
+// }
+//
+// #[cfg(unix)]
+// #[no_mangle]
+// pub fn sendto(
+//     socket: libc::c_int,
+//     buf: *const libc::c_void,
+//     len: libc::size_t,
+//     flags: libc::c_int,
+//     addr: *const libc::sockaddr,
+//     addrlen: libc::socklen_t,
+// ) -> libc::ssize_t {
+//     todo!()
+// }
+//
+// #[cfg(any(
+//     target_os = "macos",
+//     target_os = "ios",
+//     target_os = "tvos",
+//     target_os = "watchos",
+//     target_os = "freebsd",
+//     target_os = "dragonfly",
+//     target_os = "openbsd",
+//     target_os = "netbsd"
+// ))]
+// #[no_mangle]
+// pub fn sendmsg(fd: libc::c_int, msg: *const libc::msghdr, flags: libc::c_int) -> libc::ssize_t {
+//     todo!()
+// }
 
 //sleep相关
 #[cfg(unix)]
@@ -251,6 +318,10 @@ pub extern "C" fn usleep(secs: libc::c_uint) -> libc::c_int {
     nanosleep(&rqtp, &mut rmtp)
 }
 
+static mut NANOSLEEP: Option<
+    extern "C" fn(*const libc::timespec, *mut libc::timespec) -> libc::c_int,
+> = None;
+
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 #[cfg(unix)]
 #[no_mangle]
@@ -275,15 +346,23 @@ pub extern "C" fn nanosleep(rqtp: *const libc::timespec, rmtp: *mut libc::timesp
         tv_sec: sec,
         tv_nsec: nsec,
     };
-    unsafe {
-        //获取原始系统函数nanosleep，后续需要抽成单独的方法
-        let original = std::mem::transmute::<
-            _,
-            extern "C" fn(*const libc::timespec, *mut libc::timespec) -> libc::c_int,
-        >(libc::dlsym(libc::RTLD_NEXT, "nanosleep".as_ptr() as _));
-        //相当于libc::nanosleep(&rqtp, rmtp)
-        original(&rqtp, rmtp)
-    }
+    //获取原始系统函数nanosleep
+    let original = unsafe {
+        match NANOSLEEP {
+            Some(original) => original,
+            None => {
+                let original =
+                    std::mem::transmute::<
+                        _,
+                        extern "C" fn(*const libc::timespec, *mut libc::timespec) -> libc::c_int,
+                    >(libc::dlsym(libc::RTLD_NEXT, "nanosleep".as_ptr() as _));
+                NANOSLEEP = Some(original);
+                original
+            }
+        }
+    };
+    //相当于libc::nanosleep(&rqtp, rmtp)
+    original(&rqtp, rmtp)
 }
 
 #[no_mangle]
