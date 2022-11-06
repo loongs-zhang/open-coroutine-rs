@@ -213,7 +213,8 @@ impl Scheduler {
                                         >,
                                 );
                                 coroutine.set_status(Status::Ready);
-                                self.ready.push_back(coroutine)
+                                //优先执行到时间的协程
+                                self.ready.push_front(coroutine)
                             }
                         }
                     }
