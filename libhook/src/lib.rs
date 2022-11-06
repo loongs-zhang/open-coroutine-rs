@@ -80,28 +80,63 @@ pub fn select(
             }
         }
     };
-    //相当于libc::select(nfds,readfs,writefds,errorfds,timeout)
+    //相当于libc::select(nfds, readfs, writefds, errorfds, timeout)
     original(nfds, readfs, writefds, errorfds, timeout)
 }
 
-// #[cfg(any(
-//     target_os = "macos",
-//     target_os = "ios",
-//     target_os = "tvos",
-//     target_os = "watchos"
-// ))]
-// #[no_mangle]
-// pub fn kevent(
-//     kq: libc::c_int,
-//     changelist: *const libc::kevent,
-//     nchanges: libc::c_int,
-//     eventlist: *mut libc::kevent,
-//     nevents: libc::c_int,
-//     timeout: *const libc::timespec,
-// ) -> libc::c_int {
-//     todo!()
-// }
-//
+static mut KEVENT: Option<
+    extern "C" fn(
+        libc::c_int,
+        *const libc::kevent,
+        libc::c_int,
+        *mut libc::kevent,
+        libc::c_int,
+        *const libc::timespec,
+    ) -> libc::c_int,
+> = None;
+
+#[cfg(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "tvos",
+    target_os = "watchos"
+))]
+#[no_mangle]
+pub fn kevent(
+    kq: libc::c_int,
+    changelist: *const libc::kevent,
+    nchanges: libc::c_int,
+    eventlist: *mut libc::kevent,
+    nevents: libc::c_int,
+    timeout: *const libc::timespec,
+) -> libc::c_int {
+    //todo
+    //获取原始系统函数kevent
+    let original = unsafe {
+        match KEVENT {
+            Some(original) => original,
+            None => {
+                let original =
+                    std::mem::transmute::<
+                        _,
+                        extern "C" fn(
+                            libc::c_int,
+                            *const libc::kevent,
+                            libc::c_int,
+                            *mut libc::kevent,
+                            libc::c_int,
+                            *const libc::timespec,
+                        ) -> libc::c_int,
+                    >(libc::dlsym(libc::RTLD_NEXT, "kevent".as_ptr() as _));
+                KEVENT = Some(original);
+                original
+            }
+        }
+    };
+    //相当于libc::kevent(kq, changelist, nchanges, eventlist, nevents, timeout)
+    original(kq, changelist, nchanges, eventlist, nevents, timeout)
+}
+
 // #[cfg(target_os = "linux")]
 // #[no_mangle]
 // pub fn epoll_wait(
