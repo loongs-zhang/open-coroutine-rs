@@ -1,4 +1,6 @@
 # open-coroutine-rs
+这个库不再更新了，请移步：[open-coroutine](https://github.com/acl-dev/open-coroutine)
+
 这个库的实现参考了：
 1. go
    
